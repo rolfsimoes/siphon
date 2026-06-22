@@ -3,7 +3,7 @@
     # private state
     explicit_on_error <- explicit
     default_on_error <- NULL
-    
+
     # public methods
     list(
         get = function() explicit_on_error %||% default_on_error %||% "stop",
@@ -25,6 +25,25 @@
         should_continue = function() {
             policy <- explicit_on_error %||% default_on_error %||% "stop"
             policy == "continue"
+        }
+    )
+}
+
+# Internal constructor for backend resolution
+.pump_backend_policy <- function(explicit = NULL, upstream = NULL) {
+    # private state
+    explicit_backend <- explicit
+    default_backend <- NULL
+
+    # public methods
+    list(
+        get = function() explicit_backend %||% default_backend %||% "main",
+        set_default = function(value) {
+            default_backend <<- value
+            if (!is.null(upstream) && is.function(upstream$set_backend)) {
+                upstream$set_backend(value)
+            }
+            invisible(NULL)
         }
     )
 }
@@ -78,10 +97,11 @@
 }
 
 # Internal constructor for empty stage objects
-.pump_empty_stage <- function(upstream, backend, explicit_on_error) {
+.pump_empty_stage <- function(upstream, backend, explicit_on_error, explicit_backend = NULL) {
     stats <- .pump_stats()
     error_policy <- .pump_error_policy(explicit = explicit_on_error, upstream = upstream)
-    
+    backend_policy <- .pump_backend_policy(explicit = explicit_backend, upstream = upstream)
+
     structure(list(
         next_item = function() NULL,
         length = function() 0L,
@@ -99,6 +119,8 @@
         reset_stats = function() stats$reset(),
         set_on_error = function(default) error_policy$set_default(default),
         get_on_error = function() error_policy$get(),
+        set_backend = function(default) backend_policy$set_default(default),
+        get_backend = function() backend_policy$get(),
         item_commit = function(id, data) {
             upstream$item_commit(id, data)
         },
@@ -122,16 +144,18 @@
                         backend,
                         max_workers,
                         buffer_size,
-                        explicit_on_error) {
+                        explicit_on_error,
+                        explicit_backend = NULL) {
     # private members
     n <- upstream$length()
     i <- 0L
     stats <- .pump_stats()
     error_policy <- .pump_error_policy(explicit = explicit_on_error, upstream = upstream)
+    backend_policy <- .pump_backend_policy(explicit = explicit_backend, upstream = upstream)
     
     # Handle empty upstreams
     if (is.finite(n) && n == 0L) {
-        return(.pump_empty_stage(upstream = upstream, backend = backend, explicit_on_error = explicit_on_error))
+        return(.pump_empty_stage(upstream = upstream, backend = backend, explicit_on_error = explicit_on_error, explicit_backend = explicit_backend))
     }
     buf <- .pump_queue(buffer_size)
     sl <- .pump_slots(max_workers)
@@ -268,6 +292,8 @@
         reset_stats = function() stats$reset(),
         set_on_error = function(default) error_policy$set_default(default),
         get_on_error = function() error_policy$get(),
+        set_backend = function(default) backend_policy$set_default(default),
+        get_backend = function() backend_policy$get(),
         item_commit = function(id, data) {
             upstream$item_commit(id, data)
         },
@@ -296,8 +322,9 @@
 #'   implicitly wrapped as a basic source.
 #' @param fn A function. It receives one item as its first argument.
 #' @param ... Additional arguments passed to `fn`.
-#' @param backend A backend object or one of `"main"`, `"default"`, `"mirai"`,
-#'   or `"future"`.
+#' @param backend A backend object or one of `"main"`, `"mirai"`,
+#'   or `"future"`. If `NULL` (the default), the stage inherits the backend
+#'   set by `pump_run()` or `pump_drain()`.
 #' @param max_workers Maximum number of active jobs for this stage. Defaults to the
 #'   backend worker count. Ignored for the synchronous `main_backend()` (which always uses 1).
 #' @param on_error How to handle item errors: `"stop"` throws on first error,
@@ -321,7 +348,7 @@
 pump <- function(x,
                  fn,
                  ...,
-                 backend = "main",
+                 backend = NULL,
                  max_workers = NULL,
                  on_error = NULL,
                  buffer_size = NULL) {
@@ -331,7 +358,16 @@ pump <- function(x,
     if (!is.null(on_error)) {
         on_error <- match.arg(on_error, c("stop", "collect", "continue"))
     }
-    
+
+    # Resolve backend: explicit backend parameter, or default from upstream, or "main"
+    if (is.null(backend)) {
+        if (is.function(x$get_backend)) {
+            backend <- x$get_backend()
+        } else {
+            backend <- "main"
+        }
+    }
+
     # Resolve and validate backend
     backend <- .pump_resolve_backend(backend)
     if (.pump_executor_count(backend) < 1L) {
@@ -379,6 +415,7 @@ pump <- function(x,
         backend = backend,
         max_workers = max_workers,
         buffer_size = buffer_size,
-        explicit_on_error = on_error
+        explicit_on_error = on_error,
+        explicit_backend = if (is.null(backend)) NULL else backend
     )
 }

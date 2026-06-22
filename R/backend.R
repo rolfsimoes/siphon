@@ -6,7 +6,6 @@
         future = future_backend(),
         mirai = mirai_backend(),
         main = main_backend(),
-        default = main_backend(),
         stop("invalid backend")
     )
 }

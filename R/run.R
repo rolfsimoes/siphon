@@ -11,6 +11,9 @@
 #'   explicitly set their own `on_error`: `"stop"` throws on first error,
 #'   `"collect"` propagates error objects, `"continue"` drops failed items.
 #'   Defaults to `"stop"`.
+#' @param backend Default backend for all stages that do not explicitly set
+#'   their own `backend`. Can be a backend object or one of `"main"`,
+#'   `"mirai"`, or `"future"`. Defaults to `"main"`.
 #' @param timeout Maximum time in seconds to wait for completion. If
 #'   NULL (default), waits indefinitely. If exceeded, throws an error.
 #'
@@ -44,6 +47,7 @@ pump_run <- function(x,
                       sleep_ms = 10,
                       verbose = TRUE,
                       on_error = "stop",
+                      backend = "main",
                       timeout = NULL) {
     if (!inherits(x, "pump")) x <- .pump_source_basic(x)
     on.exit(if (is.function(x$close)) x$close(), add = TRUE)
@@ -62,6 +66,10 @@ pump_run <- function(x,
     # Set the global default on the pipeline so each stage can resolve its
     # effective policy (explicit stage policy wins over this default).
     if (is.function(x$set_on_error)) x$set_on_error(on_error)
+
+    # Set the global default backend on the pipeline so each stage can resolve its
+    # effective backend (explicit stage backend wins over this default).
+    if (is.function(x$set_backend)) x$set_backend(backend)
 
     progress <- verbose
     if (is.infinite(x$pipeline_length()) || x$pipeline_length() / .pump_executor_count(x$backend()) < 2L) {
@@ -141,6 +149,9 @@ pump_run <- function(x,
 #'   called for each completed item.
 #' @param sleep_ms Delay in milliseconds between polls when no item is ready.
 #' @param verbose If `TRUE`, show a text progress bar.
+#' @param backend Default backend for all stages that do not explicitly set
+#'   their own `backend`. Can be a backend object or one of `"main"`,
+#'   `"mirai"`, or `"future"`. Defaults to `"main"`.
 #'
 #' @return Invisible `NULL`.
 #' @examples
@@ -151,10 +162,14 @@ pump_run <- function(x,
 #' })
 #' print(results)
 #' @export
-pump_drain <- function(x, handle_fn, sleep_ms = 10, verbose = TRUE) {
+pump_drain <- function(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main") {
     if (!inherits(x, "pump")) x <- .pump_source_basic(x)
     if (!is.function(handle_fn)) stop("handle_fn must be a function")
     on.exit(if (is.function(x$close)) x$close(), add = TRUE)
+
+    # Set the global default backend on the pipeline so each stage can resolve its
+    # effective backend (explicit stage backend wins over this default).
+    if (is.function(x$set_backend)) x$set_backend(backend)
 
     progress <- verbose
     if (is.infinite(x$pipeline_length()) || x$pipeline_length() / .pump_executor_count(x$backend()) < 2L) {

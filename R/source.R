@@ -52,6 +52,7 @@
     original_data <- x
     i <- 0L
     err_count <- NULL # computed lazily on first access
+    default_backend <- "main"
 
     # private method to compute error count lazily
     get_err_count <- function() {
@@ -122,7 +123,12 @@
         item_commit = function(id, data) invisible(NULL),
         item_abort = function(id, error = NULL, data = NULL) invisible(NULL),
         item_release = function(id) invisible(NULL),
-        backend = function() main_backend()
+        backend = function() main_backend(),
+        set_backend = function(value) {
+            default_backend <<- value
+            invisible(NULL)
+        },
+        get_backend = function() default_backend
     )
 
     structure(self, class = "pump")
@@ -209,6 +215,7 @@ pump_source <- function(pull_fn,
     }
 
     internal_ordinal <- 0L
+    default_backend <- "main"
     # polling statistics
     poll_hits <- 0L
     poll_misses <- 0L
@@ -274,7 +281,12 @@ pump_source <- function(pull_fn,
         item_commit = item_commit_resolved,
         item_abort = item_abort_resolved,
         item_release = item_release_resolved,
-        backend = function() main_backend()
+        backend = function() main_backend(),
+        set_backend = function(value) {
+            default_backend <<- value
+            invisible(NULL)
+        },
+        get_backend = function() default_backend
     )
     structure(self, class = "pump")
 }
