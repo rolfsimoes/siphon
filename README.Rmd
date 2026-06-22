@@ -1,0 +1,65 @@
+---
+output: github_document
+---
+
+<!-- This README.md is automatically generated from README.Rmd. Do not edit README.md directly; make changes to README.Rmd instead. -->
+
+# siphon
+
+`siphon` is a small runtime for pull-based staged pipelines in R.
+
+It is not a replacement for `future`, `mirai`, `parallel`, or other execution
+backends. Those tools execute jobs. `siphon` connects stages, limits active jobs
+with slots, and lets items move to downstream stages as soon as they are ready.
+
+## Installation
+
+Install the development version from GitHub:
+
+```r
+# install.packages("devtools")
+devtools::install_github("rolfsimoes/siphon")
+```
+
+Once published on CRAN, install with:
+
+```r
+install.packages("siphon")
+```
+
+```{r}
+library(siphon)
+
+# Define test data
+items <- 1:5
+
+# Two-stage pipeline showing flow composition
+res <- items |>
+  pump(function(x) x + 1, backend = "main") |>
+  pump(function(x) x * 2, backend = "main") |>
+  pump_run(verbose = FALSE)
+
+# Results in original input order
+print(res)
+```
+
+## Features
+
+- **Pull-based staged pipelines** - Items move to downstream stages as soon as they are ready, without waiting for upstream completion
+- **Multiple execution backends** - Support for main thread, mirai, and future backends
+- **Backpressure control** - Bounded buffers with `buffer_size` to limit memory usage
+- **Concurrency control** - Per-stage `max_workers` to manage resource constraints
+- **Error handling** - Flexible error policies: `"collect"`, `"stop"`, or `"continue"`
+- **Timeout protection** - Optional `timeout` in `pump_run()` to avoid infinite polling
+- **Status inspection** - `pump_status()` for monitoring pipeline state
+- **Order preservation** - Results returned in original input order regardless of execution order
+- **Custom sources** - `pump_source()` to connect external data sources (queues, databases, files)
+- **Streaming drain** - `pump_drain()` for memory-safe daemon-style processing
+
+Use direct parallel map tools when the problem is simply `lapply(x, f)` with
+workers. Use `siphon` when the problem is a staged flow with different resource
+constraints per stage, such as CPU preparation, main-thread GPU dispatch, and
+parallel I/O.
+
+See the `vignette("siphon")` for a longer introduction with error handling and
+status inspection examples.
