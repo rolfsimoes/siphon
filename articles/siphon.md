@@ -330,12 +330,12 @@ print(snapshot)
 #.     done:    3
 #.     errors:  0
 #.     polls:   3 hits, 12 misses (20% hit)
-#.     time:    92.7ms (fn: 90.5ms, idle: 2.2ms)
+#.     time:    92.6ms (fn: 90.5ms, idle: 2.1ms)
 #. 
 #.   Summary:
 #.     poll_wall_time: 4.4ms
-#.     fn:             90.8ms
-#.     idle:           2.8ms
+#.     fn:             91ms
+#.     idle:           2.7ms
 
 mirai::daemons(0)
 ```
@@ -599,12 +599,12 @@ print(pump_status(f))
 #.     done:    5
 #.     errors:  0
 #.     polls:   5 hits, 6 misses (45.5% hit)
-#.     time:    8.2ms (fn: 0.1ms, idle: 8.1ms)
+#.     time:    5.9ms (fn: 0.1ms, idle: 5.7ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 9.7ms
-#.     fn:             51ms
-#.     idle:           14.5ms
+#.     poll_wall_time: 7.5ms
+#.     fn:             51.1ms
+#.     idle:           6.7ms
 
 mirai::daemons(0)
 ```
@@ -675,8 +675,8 @@ responsibility).
 
 For a complete example of implementing a database-backed queue source
 using `liteq` for long-running daemon processes, see the [Asynchronous
-Daemons with siphon and
-liteq](https://rolfsimoes.github.io/siphon/articles/daemons.md) vignette
+Daemons](https://rolfsimoes.github.io/siphon/articles/daemons.md)
+vignette
 ([`vignette("daemons", package = "siphon")`](https://rolfsimoes.github.io/siphon/articles/daemons.md)).
 
 ## Quick reference

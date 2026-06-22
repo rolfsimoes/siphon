@@ -395,12 +395,12 @@ sink:</p>
 <span><span class="co">#.     done:    3</span></span>
 <span><span class="co">#.     errors:  0</span></span>
 <span><span class="co">#.     polls:   3 hits, 12 misses (20% hit)</span></span>
-<span><span class="co">#.     time:    92.7ms (fn: 90.5ms, idle: 2.2ms)</span></span>
+<span><span class="co">#.     time:    92.6ms (fn: 90.5ms, idle: 2.1ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
 <span><span class="co">#.     poll_wall_time: 4.4ms</span></span>
-<span><span class="co">#.     fn:             90.8ms</span></span>
-<span><span class="co">#.     idle:           2.8ms</span></span>
+<span><span class="co">#.     fn:             91ms</span></span>
+<span><span class="co">#.     idle:           2.7ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>The source holds 20 items and Stage 1 could process them almost
@@ -662,12 +662,12 @@ behaved:</p>
 <span><span class="co">#.     done:    5</span></span>
 <span><span class="co">#.     errors:  0</span></span>
 <span><span class="co">#.     polls:   5 hits, 6 misses (45.5% hit)</span></span>
-<span><span class="co">#.     time:    8.2ms (fn: 0.1ms, idle: 8.1ms)</span></span>
+<span><span class="co">#.     time:    5.9ms (fn: 0.1ms, idle: 5.7ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
-<span><span class="co">#.     poll_wall_time: 9.7ms</span></span>
-<span><span class="co">#.     fn:             51ms</span></span>
-<span><span class="co">#.     idle:           14.5ms</span></span>
+<span><span class="co">#.     poll_wall_time: 7.5ms</span></span>
+<span><span class="co">#.     fn:             51.1ms</span></span>
+<span><span class="co">#.     idle:           6.7ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>At a glance, the report confirms every item was pulled
@@ -733,8 +733,8 @@ external data systems (files, databases, message queues) using
 <code>id</code> must be a non-missing, scalar atomic value, and
 uniqueness of this identifier is the user’s responsibility).</p>
 <p>For a complete example of implementing a database-backed queue source
-using <code>liteq</code> for long-running daemon processes, see the <a href="daemons.html">Asynchronous Daemons with siphon and liteq</a>
-vignette (<code><a href="../articles/daemons.html">vignette("daemons", package = "siphon")</a></code>).</p>
+using <code>liteq</code> for long-running daemon processes, see the <a href="daemons.html">Asynchronous Daemons</a> vignette
+(<code><a href="../articles/daemons.html">vignette("daemons", package = "siphon")</a></code>).</p>
 </div>
 <div class="section level2">
 <h2 id="quick-reference">Quick reference<a class="anchor" aria-label="anchor" href="#quick-reference"></a>
