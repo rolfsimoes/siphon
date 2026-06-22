@@ -269,13 +269,13 @@ print(snapshot)
 #.     buffer:  0/20
 #.     done:    3
 #.     errors:  0
-#.     polls:   3 hits, 12 misses (20% hit)
-#.     time:    92.7ms (fn: 90.4ms, idle: 2.3ms)
+#.     polls:   3 hits, 11 misses (21.4% hit)
+#.     time:    93ms (fn: 90.5ms, idle: 2.5ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 4.4ms
-#.     fn:             90.7ms
-#.     idle:           3ms
+#.     poll_wall_time: 4.9ms
+#.     fn:             90.8ms
+#.     idle:           3.2ms
 
 mirai::daemons(0)
 ```
@@ -527,13 +527,13 @@ print(pump_status(f))
 #.     buffer:  0/5
 #.     done:    5
 #.     errors:  0
-#.     polls:   5 hits, 5 misses (50% hit)
-#.     time:    2.4ms (fn: 0.1ms, idle: 2.3ms)
+#.     polls:   5 hits, 6 misses (45.5% hit)
+#.     time:    2.7ms (fn: 0.1ms, idle: 2.6ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 4.4ms
+#.     poll_wall_time: 4.9ms
 #.     fn:             51ms
-#.     idle:           3.1ms
+#.     idle:           3.6ms
 
 mirai::daemons(0)
 ```
