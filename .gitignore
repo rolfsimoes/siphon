@@ -9,3 +9,4 @@ docs/
 *.Rhistory
 *.RData
 docs
+_snap/
