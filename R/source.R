@@ -1,0 +1,258 @@
+# Private: wrap a basic R object as a pull-based item source.
+# Each item receives a stable user-visible id, and a sequential integer idx used
+# by downstream stages and by pump_run() to collect results in input order.
+.pump_validate_idx <- function(idx) {
+    if (is.null(idx)) {
+        stop("Internal error: item index (idx) is missing")
+    }
+    if (length(idx) != 1L) {
+        stop("Internal error: item index (idx) must be a scalar")
+    }
+    if (is.na(idx)) {
+        stop("Internal error: item index (idx) must be finite and non-missing")
+    }
+    if (!is.numeric(idx) && !is.integer(idx)) {
+        stop("Internal error: item index (idx) must be numeric")
+    }
+    if (!is.finite(idx)) {
+        stop("Internal error: item index (idx) must be finite and non-missing")
+    }
+    if (idx %% 1 != 0) {
+        stop("Internal error: item index (idx) must be a whole number")
+    }
+    if (idx < 1L) {
+        stop("Internal error: item index (idx) must be >= 1")
+    }
+    if (idx > .Machine$integer.max) {
+        stop("Internal error: item index (idx) exceeds maximum integer range")
+    }
+    as.integer(idx)
+}
+
+.pump_error <- function(e) {
+    class(e) <- c("pump_error", class(e))
+    e
+}
+
+.pump_unwrap_error <- function(x) {
+    if (inherits(x, "pump_error")) {
+        class(x) <- setdiff(class(x), "pump_error")
+    }
+    x
+}
+
+.pump_source_basic <- function(x) {
+    # check parameters
+    if (inherits(x, "pump")) {
+        return(x)
+    }
+
+    # private members
+    n <- length(x)
+    original_data <- x
+    i <- 0L
+    err_count <- NULL # computed lazily on first access
+
+    # private method to compute error count lazily
+    get_err_count <- function() {
+        if (is.null(err_count)) {
+            err_count <<- sum(vapply(seq_len(n), function(i) {
+                inherits(original_data[[i]], "pump_error")
+            }, logical(1)))
+        }
+        err_count
+    }
+
+    # polling statistics
+    poll_hits <- 0L
+    poll_misses <- 0L
+    wall_time <- 0.0
+    # timing statistics
+    fn_time <- 0.0
+    idle_time <- 0.0
+
+    # public methods
+    self <- list(
+        next_item = function() {
+            # Measure timing
+            start_time <- Sys.time()
+
+            if (i >= n) {
+                end_time <- Sys.time()
+                elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
+                wall_time <<- wall_time + elapsed
+                poll_misses <<- poll_misses + 1L
+                idle_time <<- idle_time + elapsed
+                return(NULL)
+            }
+            i <<- i + 1L
+            data <- original_data[[i]]
+            end_time <- Sys.time()
+            elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
+            wall_time <<- wall_time + elapsed
+            poll_hits <<- poll_hits + 1L
+            list(
+                id = i,
+                idx = i,
+                data = data,
+                ok = !inherits(data, "pump_error")
+            )
+        },
+        length = function() n,
+        pipeline_length = function() n,
+        buffer = function() NULL,
+        slots = function() NULL,
+        progress = function() i,
+        stage_completed = function() i,
+        errors = function() get_err_count(),
+        poll_hits = function() poll_hits,
+        poll_misses = function() poll_misses,
+        poll_wall_time = function() wall_time,
+        fn_time = function() fn_time,
+        idle_time = function() idle_time,
+        reset_stats = function() {
+            poll_hits <<- 0L
+            poll_misses <<- 0L
+            wall_time <<- 0.0
+            fn_time <<- 0.0
+            idle_time <<- 0.0
+        },
+        done = function() i == n,
+        close = function() invisible(NULL),
+        backend = function() main_backend()
+    )
+
+    structure(self, class = "pump")
+}
+
+#' Create a custom siphon source
+#'
+#' `pump_source()` creates a custom pull-based source for use with `pump()`
+#' pipelines. Use this to connect external data sources such as message queues,
+#' databases, or file readers to a siphon pipeline.
+#'
+#' The `pull_fn` function is called repeatedly by downstream stages to retrieve
+#' items. It should return `list(id, data, ok)` when an item is available, or
+#' `NULL` when no item is ready. The source is considered infinite by default
+#' (suitable for daemon-style processing); pass a `done_fn` to signal when the
+#' source is exhausted.
+#'
+#' @param pull_fn A function with no arguments that returns
+#'   `list(id, data, ok)` or `NULL`. The returned list must contain a
+#'   non-missing, scalar atomic user-visible `id` (uniqueness is the user's
+#'   responsibility), the `data` object, and a non-missing scalar logical `ok`
+#'   flag indicating success.
+#' @param done_fn A function with no arguments returning `TRUE` or `FALSE`.
+#'   Defaults to `NULL` (source never finishes on its own).
+#' @param close_fn An optional function with no arguments for resource cleanup
+#'   (e.g., closing file connections or database handles). Called automatically
+#'   by `pump_run()` and `pump_drain()` when execution completes.
+#' @param length The total number of items to expect. Defaults to `Inf`.
+#'   Used by `pump_run()` for result pre-allocation and progress reporting.
+#'
+#' @return A pump object that can be piped into `pump()`.
+#' @examples
+#' # A simple counter source
+#' counter_source <- function(n) {
+#'     i <- 0L
+#'     pump_source(
+#'         pull_fn = function() {
+#'             if (i >= n) {
+#'                 return(NULL)
+#'             }
+#'             i <<- i + 1L
+#'             list(id = i, data = i, ok = TRUE)
+#'         },
+#'         done_fn = function() i >= n,
+#'         length = n
+#'     )
+#' }
+#' src <- counter_source(5)
+#' res <- src |>
+#'     pump(function(x) x * 2) |>
+#'     pump_run(verbose = FALSE)
+#' print(res)
+#' @export
+pump_source <- function(pull_fn,
+                        done_fn = NULL,
+                        close_fn = NULL,
+                        length = Inf) {
+    if (!is.function(pull_fn)) stop("pull_fn must be a function")
+
+    # Defaults
+    done_resolved <- if (is.null(done_fn)) function() FALSE else done_fn
+    close_resolved <- if (is.null(close_fn)) function() invisible(NULL) else close_fn
+    length_fn <- if (is.function(length)) length else function() length
+
+    internal_ordinal <- 0L
+    # polling statistics
+    poll_hits <- 0L
+    poll_misses <- 0L
+    wall_time <- 0.0
+    # timing statistics
+    fn_time <- 0.0
+    idle_time <- 0.0
+
+    wrapped_pull_fn <- function() {
+        # Measure timing
+        start_time <- Sys.time()
+
+        msg <- pull_fn()
+        if (is.null(msg)) {
+            end_time <- Sys.time()
+            elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
+            wall_time <<- wall_time + elapsed
+            poll_misses <<- poll_misses + 1L
+            idle_time <<- idle_time + elapsed
+            return(NULL)
+        }
+        if (!is.list(msg) || !all(c("id", "data", "ok") %in% names(msg))) {
+            stop("pull_fn must return NULL or a list with 'id', 'data', and 'ok' elements")
+        }
+        if (is.null(msg$id) || !is.atomic(msg$id) || length(msg$id) != 1L || is.na(msg$id)) {
+            stop("pull_fn must return items with a valid scalar atomic 'id'")
+        }
+        if (!is.logical(msg$ok) || length(msg$ok) != 1L || is.na(msg$ok)) {
+            stop("pull_fn must return items with a valid scalar logical 'ok'")
+        }
+        internal_ordinal <<- internal_ordinal + 1L
+        msg$idx <- internal_ordinal
+        end_time <- Sys.time()
+        elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
+        wall_time <<- wall_time + elapsed
+        poll_hits <<- poll_hits + 1L
+        msg
+    }
+
+    self <- list(
+        next_item = wrapped_pull_fn,
+        length = length_fn,
+        pipeline_length = length_fn,
+        buffer = function() NULL,
+        slots = function() NULL,
+        progress = function() 0L,
+        stage_completed = function() 0L,
+        errors = function() 0L,
+        poll_hits = function() poll_hits,
+        poll_misses = function() poll_misses,
+        poll_wall_time = function() wall_time,
+        fn_time = function() fn_time,
+        idle_time = function() idle_time,
+        reset_stats = function() {
+            poll_hits <<- 0L
+            poll_misses <<- 0L
+            wall_time <<- 0.0
+            fn_time <<- 0.0
+            idle_time <<- 0.0
+        },
+        done = done_resolved,
+        close = close_resolved,
+        backend = function() main_backend()
+    )
+    structure(self, class = "pump")
+}
+
+#' @export
+length.pump <- function(x) {
+    x$length()
+}
