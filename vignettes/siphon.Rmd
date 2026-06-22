@@ -154,7 +154,7 @@ The `max_workers` parameter specifies the maximum number of active processing sl
 
 | Backend | Constructor | String Alias | Description |
 |---|---|---|---|
-| Main thread | `main_backend()` | `"main"` or `"default"` | Runs jobs synchronously in the current R process. |
+| Main thread | `main_backend()` | `"main"` | Runs jobs synchronously in the current R process. |
 | Mirai | `mirai_backend()` | `"mirai"` | Submits jobs through `mirai::mirai()`. |
 | Future | `future_backend()` | `"future"` | Submits jobs through `future::future()`. |
 
@@ -166,6 +166,34 @@ f1 <- items |> pump(function(x) x * 2, backend = main_backend())
 
 # Using string alias
 f2 <- items |> pump(function(x) x * 2, backend = "main")
+```
+
+### Pipeline-wide backend defaults
+
+You can set a pipeline-wide default backend via `pump_run()` or `pump_drain()`. When a stage is created with `pump(..., backend = NULL)` (the default), it inherits the backend set by `pump_run(..., backend = ...)`. An explicit stage-level `backend` always overrides the pipeline-wide default.
+
+This is useful when you want to run an entire pipeline on a specific backend without repeating the backend specification for each stage:
+
+```{r}
+# Set a pipeline-wide default backend
+res <- items |>
+  pump(function(x) x * 2) |>  # Inherits "main" from pump_run
+  pump(function(x) x + 10) |> # Inherits "main" from pump_run
+  pump_run(backend = "main", verbose = FALSE)
+
+print(res)
+```
+
+You can still override the default for specific stages:
+
+```{r}
+# Override the default for a specific stage
+res <- items |>
+  pump(function(x) x * 2, backend = "main") |> # Explicit override
+  pump(function(x) x + 10) |>                  # Inherits "main" from pump_run
+  pump_run(backend = "main", verbose = FALSE)
+
+print(res)
 ```
 
 ### Worker lifecycle management
@@ -372,8 +400,19 @@ Call `pump_status()` after a run to see how the pipeline behaved:
 mirai::daemons(2)
 
 f <- 1:5 |>
-  pump(function(x) { Sys.sleep(0.01); x + 10 }, backend = mirai_backend(), max_workers = 2) |>
-  pump(function(x) x * 2, backend = mirai_backend(), max_workers = 2)
+  pump(
+    function(x) { 
+      Sys.sleep(0.01)
+      x + 10
+    }, 
+    backend = "mirai", 
+    max_workers = 2
+  ) |>
+  pump(
+    function(x) x * 2, 
+    backend = "mirai", 
+    max_workers = 2
+  )
 
 pump_run(f, verbose = FALSE)
 
