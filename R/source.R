@@ -158,6 +158,14 @@
 #'   by `pump_run()` and `pump_drain()` when execution completes.
 #' @param length The total number of items to expect. Defaults to `Inf`.
 #'   Used by `pump_run()` for result pre-allocation and progress reporting.
+#' @param item_commit_fn An optional function called when an item successfully
+#'   completes the pipeline. Receives `id` and `data` arguments. Used for
+#'   acknowledging external resources (e.g., message queue ack).
+#' @param item_abort_fn An optional function called when an item fails.
+#'   Receives `id`, `error`, and `data` arguments. Used for rejecting external
+#'   resources (e.g., message queue nack).
+#' @param item_release_fn An optional function called when an item is released
+#'   from the pipeline (e.g., on timeout or shutdown). Receives `id` argument.
 #'
 #' @return A pump object that can be piped into `pump()`.
 #' @examples
