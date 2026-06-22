@@ -42,6 +42,7 @@ Explicit stage-level \code{on_error} always overrides the \code{pump_run()} defa
 Useful links:
 \itemize{
   \item \url{https://github.com/rolfsimoes/siphon}
+  \item \url{https://rolfsimoes.github.io/siphon/}
   \item Report bugs at \url{https://github.com/rolfsimoes/siphon/issues}
 }
 

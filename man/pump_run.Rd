@@ -4,7 +4,14 @@
 \alias{pump_run}
 \title{Run a siphon pipeline and collect results}
 \usage{
-pump_run(x, sleep_ms = 10, verbose = TRUE, on_error = "stop", timeout = NULL)
+pump_run(
+  x,
+  sleep_ms = 10,
+  verbose = TRUE,
+  on_error = "stop",
+  backend = "main",
+  timeout = NULL
+)
 }
 \arguments{
 \item{x}{A pump object or a finite R object.}
@@ -17,6 +24,10 @@ pump_run(x, sleep_ms = 10, verbose = TRUE, on_error = "stop", timeout = NULL)
 explicitly set their own \code{on_error}: \code{"stop"} throws on first error,
 \code{"collect"} propagates error objects, \code{"continue"} drops failed items.
 Defaults to \code{"stop"}.}
+
+\item{backend}{Default backend for all stages that do not explicitly set
+their own \code{backend}. Can be a backend object or one of \code{"main"},
+\code{"mirai"}, or \code{"future"}. Defaults to \code{"main"}.}
 
 \item{timeout}{Maximum time in seconds to wait for completion. If
 NULL (default), waits indefinitely. If exceeded, throws an error.}

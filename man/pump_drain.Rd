@@ -4,7 +4,7 @@
 \alias{pump_drain}
 \title{Drain a siphon pipeline}
 \usage{
-pump_drain(x, handle_fn, sleep_ms = 10, verbose = TRUE)
+pump_drain(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main")
 }
 \arguments{
 \item{x}{A pump object or a finite R object.}
@@ -15,6 +15,10 @@ called for each completed item.}
 \item{sleep_ms}{Delay in milliseconds between polls when no item is ready.}
 
 \item{verbose}{If \code{TRUE}, show a text progress bar.}
+
+\item{backend}{Default backend for all stages that do not explicitly set
+their own \code{backend}. Can be a backend object or one of \code{"main"},
+\code{"mirai"}, or \code{"future"}. Defaults to \code{"main"}.}
 }
 \value{
 Invisible \code{NULL}.

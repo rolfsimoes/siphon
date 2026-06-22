@@ -4,7 +4,15 @@
 \alias{pump_source}
 \title{Create a custom siphon source}
 \usage{
-pump_source(pull_fn, done_fn = NULL, close_fn = NULL, length = Inf)
+pump_source(
+  pull_fn,
+  done_fn = NULL,
+  close_fn = NULL,
+  length = Inf,
+  item_commit_fn = NULL,
+  item_abort_fn = NULL,
+  item_release_fn = NULL
+)
 }
 \arguments{
 \item{pull_fn}{A function with no arguments that returns
