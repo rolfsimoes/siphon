@@ -155,6 +155,9 @@ test_that("pump_run throws error if idx is missing", {
         errors = function() 0L,
         done = function() FALSE,
         close = function() invisible(NULL),
+        item_commit = function(id, data) invisible(NULL),
+        item_abort = function(id, error = NULL, data = NULL) invisible(NULL),
+        item_release = function(id) invisible(NULL),
         backend = function() main_backend()
     ), class = "pump")
 
