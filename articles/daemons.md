@@ -178,13 +178,15 @@ combining `liteq` with a parallel backend
 or
 [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md)).
 
-`liteq::try_consume()` runs a crash-recovery sweep whenever it is called
-and **no `READY` message is available**. That sweep probes the lock file
-of every in-flight (`WORKING`) message and blocks on the SQLite busy
-timeout (roughly 10 seconds) for each lock still held by the live
-consumer. A parallel siphon stage deliberately keeps several messages
-`WORKING` while their jobs run on workers, so calling `try_consume()`
-during that window stalls the daemon for about 10 seconds per in-flight
+[`liteq::try_consume()`](https://rdrr.io/pkg/liteq/man/try_consume.html)
+runs a crash-recovery sweep whenever it is called and **no `READY`
+message is available**. That sweep probes the lock file of every
+in-flight (`WORKING`) message and blocks on the SQLite busy timeout
+(roughly 10 seconds) for each lock still held by the live consumer. A
+parallel siphon stage deliberately keeps several messages `WORKING`
+while their jobs run on workers, so calling
+[`try_consume()`](https://rdrr.io/pkg/liteq/man/try_consume.html) during
+that window stalls the daemon for about 10 seconds per in-flight
 message - which looks like a hang.
 
 Guarding the call so it only consumes when a `READY` message actually
@@ -205,16 +207,18 @@ pull_fn <- function() {
 
 > **NOTE**
 >
-> Do not use `liteq::is_empty()` as this guard: it counts *all*
-> messages, including `WORKING` ones, so it stays `FALSE` while jobs are
-> in flight. Use it only for `done_fn` (the daemon is finished when no
-> messages remain at all).
+> Do not use
+> [`liteq::is_empty()`](https://rdrr.io/pkg/liteq/man/is_empty.html) as
+> this guard: it counts *all* messages, including `WORKING` ones, so it
+> stays `FALSE` while jobs are in flight. Use it only for `done_fn` (the
+> daemon is finished when no messages remain at all).
 
 ## Publishing messages to the daemon
 
 To send work to the daemon, publish messages to the queue from your web
-application or any other R process. Use `liteq::publish()` with both
-`title` (a descriptive label) and `message` (the JSON payload):
+application or any other R process. Use
+[`liteq::publish()`](https://rdrr.io/pkg/liteq/man/publish.html) with
+both `title` (a descriptive label) and `message` (the JSON payload):
 
 ``` r
 

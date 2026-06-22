@@ -140,7 +140,7 @@ internally, emits only serializable data, and calls
 <span><span class="co"># Count READY messages in the queue. See "A note on liteq and parallel</span></span>
 <span><span class="co"># backends" below for why this guard is required before try_consume().</span></span>
 <span><span class="va">n_ready</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">msgs</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu">list_messages</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
+<span>    <span class="va">msgs</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/list_messages.html" class="external-link">list_messages</a></span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">msgs</span><span class="op">)</span> <span class="op">==</span> <span class="fl">0L</span><span class="op">)</span> <span class="fl">0L</span> <span class="kw">else</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">msgs</span><span class="op">$</span><span class="va">status</span> <span class="op">==</span> <span class="st">"READY"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
@@ -148,7 +148,7 @@ internally, emits only serializable data, and calls
 <span>    <span class="fu"><a href="../reference/pump_managed_source.html">pump_managed_source</a></span><span class="op">(</span></span>
 <span>        pull_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
 <span>            <span class="kw">if</span> <span class="op">(</span><span class="fu">n_ready</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fl">1L</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
-<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu">try_consume</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
+<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/try_consume.html" class="external-link">try_consume</a></span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        id_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">msg</span><span class="op">)</span> <span class="op">{</span></span>
@@ -160,17 +160,17 @@ internally, emits only serializable data, and calls
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        commit_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">msg</span>, <span class="va">data</span><span class="op">)</span> <span class="op">{</span></span>
-<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu">ack</span><span class="op">(</span><span class="va">msg</span><span class="op">)</span></span>
+<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/ack.html" class="external-link">ack</a></span><span class="op">(</span><span class="va">msg</span><span class="op">)</span></span>
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        abort_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">msg</span>, <span class="va">error</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">data</span> <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span> <span class="op">{</span></span>
-<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu">nack</span><span class="op">(</span><span class="va">msg</span><span class="op">)</span></span>
+<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/nack.html" class="external-link">nack</a></span><span class="op">(</span><span class="va">msg</span><span class="op">)</span></span>
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        done_fn <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="va">run_forever</span><span class="op">)</span> <span class="op">{</span></span>
 <span>            <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="cn">FALSE</span></span>
 <span>        <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>            <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu">is_empty</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
+<span>            <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/is_empty.html" class="external-link">is_empty</a></span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
 <span>        <span class="op">}</span></span>
 <span>    <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
@@ -189,7 +189,7 @@ time.</p>
 <span>                             <span class="va">queue_name</span> <span class="op">=</span> <span class="st">"jobs"</span>, </span>
 <span>                             <span class="va">n_workers</span> <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>                             <span class="va">sleep_ms</span> <span class="op">=</span> <span class="fl">100</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu">ensure_queue</span><span class="op">(</span><span class="va">queue_name</span>, db <span class="op">=</span> <span class="va">db_path</span><span class="op">)</span></span>
+<span>    <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/ensure_queue.html" class="external-link">ensure_queue</a></span><span class="op">(</span><span class="va">queue_name</span>, db <span class="op">=</span> <span class="va">db_path</span><span class="op">)</span></span>
 <span></span>
 <span>    <span class="va">save_result</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">task_id</span>, <span class="va">result</span><span class="op">)</span> <span class="op">{</span></span>
 <span>        <span class="co"># Persist to your database here</span></span>
@@ -237,30 +237,30 @@ workers down cleanly. For programmatic shutdown, publish a sentinel
 above is essential when combining <code>liteq</code> with a parallel
 backend (<code><a href="../reference/mirai_backend.html">mirai_backend()</a></code> or
 <code><a href="../reference/future_backend.html">future_backend()</a></code>).</p>
-<p><code>liteq::try_consume()</code> runs a crash-recovery sweep
+<p><code><a href="https://rdrr.io/pkg/liteq/man/try_consume.html" class="external-link">liteq::try_consume()</a></code> runs a crash-recovery sweep
 whenever it is called and <strong>no <code>READY</code> message is
 available</strong>. That sweep probes the lock file of every in-flight
 (<code>WORKING</code>) message and blocks on the SQLite busy timeout
 (roughly 10 seconds) for each lock still held by the live consumer. A
 parallel siphon stage deliberately keeps several messages
 <code>WORKING</code> while their jobs run on workers, so calling
-<code>try_consume()</code> during that window stalls the daemon for
+<code><a href="https://rdrr.io/pkg/liteq/man/try_consume.html" class="external-link">try_consume()</a></code> during that window stalls the daemon for
 about 10 seconds per in-flight message - which looks like a hang.</p>
 <p>Guarding the call so it only consumes when a <code>READY</code>
 message actually exists avoids the crash-recovery path entirely:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">n_ready</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">msgs</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu">list_messages</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
+<span>    <span class="va">msgs</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/list_messages.html" class="external-link">list_messages</a></span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">msgs</span><span class="op">)</span> <span class="op">==</span> <span class="fl">0L</span><span class="op">)</span> <span class="fl">0L</span> <span class="kw">else</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">msgs</span><span class="op">$</span><span class="va">status</span> <span class="op">==</span> <span class="st">"READY"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="va">pull_fn</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="fu">n_ready</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fl">1L</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
-<span>    <span class="fu">liteq</span><span class="fu">::</span><span class="fu">try_consume</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
+<span>    <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/try_consume.html" class="external-link">try_consume</a></span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <blockquote>
 <p><strong>NOTE</strong></p>
-<p>Do not use <code>liteq::is_empty()</code> as this guard: it counts
+<p>Do not use <code><a href="https://rdrr.io/pkg/liteq/man/is_empty.html" class="external-link">liteq::is_empty()</a></code> as this guard: it counts
 <em>all</em> messages, including <code>WORKING</code> ones, so it stays
 <code>FALSE</code> while jobs are in flight. Use it only for
 <code>done_fn</code> (the daemon is finished when no messages remain at
@@ -272,29 +272,29 @@ all).</p>
 </h2>
 <p>To send work to the daemon, publish messages to the queue from your
 web application or any other R process. Use
-<code>liteq::publish()</code> with both <code>title</code> (a
+<code><a href="https://rdrr.io/pkg/liteq/man/publish.html" class="external-link">liteq::publish()</a></code> with both <code>title</code> (a
 descriptive label) and <code>message</code> (the JSON payload):</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/r-lib/liteq#readme" class="external-link">liteq</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://jeroen.r-universe.dev/jsonlite" class="external-link">jsonlite</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Create or access the queue</span></span>
-<span><span class="va">q</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu">ensure_queue</span><span class="op">(</span><span class="st">"jobs"</span>, db <span class="op">=</span> <span class="va">db_path</span><span class="op">)</span></span>
+<span><span class="va">q</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/ensure_queue.html" class="external-link">ensure_queue</a></span><span class="op">(</span><span class="st">"jobs"</span>, db <span class="op">=</span> <span class="va">db_path</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Publish a job</span></span>
-<span><span class="fu">liteq</span><span class="fu">::</span><span class="fu">publish</span><span class="op">(</span></span>
+<span><span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/publish.html" class="external-link">publish</a></span><span class="op">(</span></span>
 <span>  <span class="va">q</span>,</span>
 <span>  title <span class="op">=</span> <span class="st">"Job 1"</span>,</span>
 <span>  message <span class="op">=</span> <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Publish multiple jobs</span></span>
-<span><span class="fu">liteq</span><span class="fu">::</span><span class="fu">publish</span><span class="op">(</span></span>
+<span><span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/publish.html" class="external-link">publish</a></span><span class="op">(</span></span>
 <span>  <span class="va">q</span>,</span>
 <span>  title <span class="op">=</span> <span class="st">"Job 2"</span>,</span>
 <span>  message <span class="op">=</span> <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fl">10</span><span class="op">)</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="fu">liteq</span><span class="fu">::</span><span class="fu">publish</span><span class="op">(</span></span>
+<span><span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/publish.html" class="external-link">publish</a></span><span class="op">(</span></span>
 <span>  <span class="va">q</span>,</span>
 <span>  title <span class="op">=</span> <span class="st">"Job 3"</span>,</span>
 <span>  message <span class="op">=</span> <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">toJSON</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fl">15</span><span class="op">)</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -319,7 +319,7 @@ item ID. This is the same approach that
 <span>    <span class="fu"><a href="../reference/pump_source.html">pump_source</a></span><span class="op">(</span></span>
 <span>        pull_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
 <span>            <span class="kw">if</span> <span class="op">(</span><span class="fu">n_ready</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fl">1L</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
-<span>            <span class="va">msg</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu">try_consume</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
+<span>            <span class="va">msg</span> <span class="op">&lt;-</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/try_consume.html" class="external-link">try_consume</a></span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
 <span>            <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">msg</span><span class="op">)</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
 <span></span>
 <span>            <span class="va">registry</span><span class="op">$</span><span class="fu">set</span><span class="op">(</span><span class="va">msg</span><span class="op">$</span><span class="va">id</span>, <span class="va">msg</span><span class="op">)</span></span>
@@ -337,11 +337,11 @@ item ID. This is the same approach that
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        item_commit_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span>, <span class="va">data</span><span class="op">)</span> <span class="op">{</span></span>
-<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu">ack</span><span class="op">(</span><span class="va">registry</span><span class="op">$</span><span class="fu">get</span><span class="op">(</span><span class="va">id</span><span class="op">)</span><span class="op">)</span></span>
+<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/ack.html" class="external-link">ack</a></span><span class="op">(</span><span class="va">registry</span><span class="op">$</span><span class="fu">get</span><span class="op">(</span><span class="va">id</span><span class="op">)</span><span class="op">)</span></span>
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        item_abort_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span>, <span class="va">error</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">data</span> <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span> <span class="op">{</span></span>
-<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu">nack</span><span class="op">(</span><span class="va">registry</span><span class="op">$</span><span class="fu">get</span><span class="op">(</span><span class="va">id</span><span class="op">)</span><span class="op">)</span></span>
+<span>            <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/nack.html" class="external-link">nack</a></span><span class="op">(</span><span class="va">registry</span><span class="op">$</span><span class="fu">get</span><span class="op">(</span><span class="va">id</span><span class="op">)</span><span class="op">)</span></span>
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        item_release_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span><span class="op">)</span> <span class="op">{</span></span>
@@ -351,12 +351,12 @@ item ID. This is the same approach that
 <span>        done_fn <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="va">run_forever</span><span class="op">)</span> <span class="op">{</span></span>
 <span>            <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="cn">FALSE</span></span>
 <span>        <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>            <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu">is_empty</span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
+<span>            <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/is_empty.html" class="external-link">is_empty</a></span><span class="op">(</span><span class="va">queue</span><span class="op">)</span></span>
 <span>        <span class="op">}</span>,</span>
 <span></span>
 <span>        close_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
 <span>            <span class="va">registry</span><span class="op">$</span><span class="fu">drain</span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">id</span>, <span class="va">msg</span><span class="op">)</span> <span class="op">{</span></span>
-<span>                <span class="kw"><a href="https://rdrr.io/r/base/try.html" class="external-link">try</a></span><span class="op">(</span><span class="fu">liteq</span><span class="fu">::</span><span class="fu">nack</span><span class="op">(</span><span class="va">msg</span><span class="op">)</span>, silent <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span>                <span class="kw"><a href="https://rdrr.io/r/base/try.html" class="external-link">try</a></span><span class="op">(</span><span class="fu">liteq</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/liteq/man/nack.html" class="external-link">nack</a></span><span class="op">(</span><span class="va">msg</span><span class="op">)</span>, silent <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span>            <span class="op">}</span><span class="op">)</span></span>
 <span>        <span class="op">}</span></span>
 <span>    <span class="op">)</span></span>

@@ -49,6 +49,23 @@ pump_source(
   [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
   for result pre-allocation and progress reporting.
 
+- item_commit_fn:
+
+  An optional function called when an item successfully completes the
+  pipeline. Receives `id` and `data` arguments. Used for acknowledging
+  external resources (e.g., message queue ack).
+
+- item_abort_fn:
+
+  An optional function called when an item fails. Receives `id`,
+  `error`, and `data` arguments. Used for rejecting external resources
+  (e.g., message queue nack).
+
+- item_release_fn:
+
+  An optional function called when an item is released from the pipeline
+  (e.g., on timeout or shutdown). Receives `id` argument.
+
 ## Value
 
 A pump object that can be piped into

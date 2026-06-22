@@ -88,6 +88,23 @@ by <code><a href="pump_run.html">pump_run()</a></code> and <code><a href="pump_d
 <dd><p>The total number of items to expect. Defaults to <code>Inf</code>.
 Used by <code><a href="pump_run.html">pump_run()</a></code> for result pre-allocation and progress reporting.</p></dd>
 
+
+<dt id="arg-item-commit-fn">item_commit_fn<a class="anchor" aria-label="anchor" href="#arg-item-commit-fn"></a></dt>
+<dd><p>An optional function called when an item successfully
+completes the pipeline. Receives <code>id</code> and <code>data</code> arguments. Used for
+acknowledging external resources (e.g., message queue ack).</p></dd>
+
+
+<dt id="arg-item-abort-fn">item_abort_fn<a class="anchor" aria-label="anchor" href="#arg-item-abort-fn"></a></dt>
+<dd><p>An optional function called when an item fails.
+Receives <code>id</code>, <code>error</code>, and <code>data</code> arguments. Used for rejecting external
+resources (e.g., message queue nack).</p></dd>
+
+
+<dt id="arg-item-release-fn">item_release_fn<a class="anchor" aria-label="anchor" href="#arg-item-release-fn"></a></dt>
+<dd><p>An optional function called when an item is released
+from the pipeline (e.g., on timeout or shutdown). Receives <code>id</code> argument.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
