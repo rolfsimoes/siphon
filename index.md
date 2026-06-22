@@ -1,0 +1,96 @@
+# siphon
+
+`siphon` is a small runtime for pull-based staged pipelines in R.
+
+It is not a replacement for `future`, `mirai`, `parallel`, or other
+execution backends. Those tools execute jobs. `siphon` connects stages,
+limits active jobs with slots, and lets items move to downstream stages
+as soon as they are ready.
+
+## Installation
+
+Install the development version from GitHub:
+
+``` r
+
+# install.packages("devtools")
+devtools::install_github("rolfsimoes/siphon")
+```
+
+Once published on CRAN, install with:
+
+``` r
+
+install.packages("siphon")
+```
+
+``` r
+
+library(siphon)
+
+# Define test data
+items <- 1:5
+
+# Two-stage pipeline showing flow composition
+res <- items |>
+  pump(function(x) x + 1, backend = "main") |>
+  pump(function(x) x * 2, backend = "main") |>
+  pump_run(verbose = FALSE)
+
+# Results in original input order
+print(res)
+```
+
+``` R
+## [[1]]
+## [1] 4
+## 
+## [[2]]
+## [1] 6
+## 
+## [[3]]
+## [1] 8
+## 
+## [[4]]
+## [1] 10
+## 
+## [[5]]
+## [1] 12
+```
+
+## Features
+
+- **Pull-based staged pipelines** - Items move to downstream stages as
+  soon as they are ready, without waiting for upstream completion
+- **Multiple execution backends** - Support for main thread, mirai, and
+  future backends
+- **Backpressure control** - Bounded buffers with `buffer_size` to limit
+  memory usage
+- **Concurrency control** - Per-stage `max_workers` to manage resource
+  constraints
+- **Error handling** - Flexible error policies: `"collect"`, `"stop"`,
+  or `"continue"`
+- **Timeout protection** - Optional `timeout` in
+  [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
+  to avoid infinite polling
+- **Status inspection** -
+  [`pump_status()`](https://rolfsimoes.github.io/siphon/reference/pump_status.md)
+  for monitoring pipeline state
+- **Order preservation** - Results returned in original input order
+  regardless of execution order
+- **Custom sources** -
+  [`pump_source()`](https://rolfsimoes.github.io/siphon/reference/pump_source.md)
+  to connect external data sources (queues, databases, files)
+- **Streaming drain** -
+  [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)
+  for memory-safe daemon-style processing
+
+Use direct parallel map tools when the problem is simply `lapply(x, f)`
+with workers. Use `siphon` when the problem is a staged flow with
+different resource constraints per stage, such as CPU preparation,
+main-thread GPU dispatch, and parallel I/O.
+
+See the
+[`vignette("siphon")`](https://rolfsimoes.github.io/siphon/articles/siphon.md)
+for a longer introduction with error handling and status inspection
+examples.
