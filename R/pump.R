@@ -99,6 +99,15 @@
         reset_stats = function() stats$reset(),
         set_on_error = function(default) error_policy$set_default(default),
         get_on_error = function() error_policy$get(),
+        item_commit = function(id, data) {
+            upstream$item_commit(id, data)
+        },
+        item_abort = function(id, error = NULL, data = NULL) {
+            upstream$item_abort(id, error = error, data = data)
+        },
+        item_release = function(id) {
+            upstream$item_release(id)
+        },
         done = function() TRUE,
         close = function() if (is.function(upstream$close)) upstream$close(),
         backend = function() backend,
@@ -128,6 +137,22 @@
     sl <- .pump_slots(max_workers)
 
     # private methods
+    discard_item <- function(msg) {
+        upstream$item_abort(
+            id = msg$id,
+            error = if (inherits(msg$data, "pump_error")) {
+                .pump_unwrap_error(msg$data)
+            } else {
+                NULL
+            },
+            data = msg$data
+        )
+
+        upstream$item_release(msg$id)
+
+        invisible(NULL)
+    }
+
     drain_completed <- function() {
         # drain completed jobs and put them in out queue
         while (sl$active() > 0L) {
@@ -156,7 +181,9 @@
                 if (error_policy$should_stop()) stop(.pump_unwrap_error(data))
             }
             i <<- i + 1L
-            if (!(error_policy$should_continue() && !msg$ok)) {
+            if (error_policy$should_continue() && !msg$ok) {
+                discard_item(msg)
+            } else {
                 buf$push(msg)
             }
         }
@@ -187,7 +214,9 @@
                 stats$add_error()
                 if (error_policy$should_stop()) stop(.pump_unwrap_error(msg$data))
                 i <<- i + 1L
-                if (!(error_policy$should_continue() && !msg$ok)) {
+                if (error_policy$should_continue() && !msg$ok) {
+                    discard_item(msg)
+                } else {
                     buf$push(msg)
                 }
             }
@@ -239,6 +268,15 @@
         reset_stats = function() stats$reset(),
         set_on_error = function(default) error_policy$set_default(default),
         get_on_error = function() error_policy$get(),
+        item_commit = function(id, data) {
+            upstream$item_commit(id, data)
+        },
+        item_abort = function(id, error = NULL, data = NULL) {
+            upstream$item_abort(id, error = error, data = data)
+        },
+        item_release = function(id) {
+            upstream$item_release(id)
+        },
         done = function() upstream$done() && buf$size() == 0L && sl$active() == 0L,
         close = function() if (is.function(upstream$close)) upstream$close(),
         backend = function() backend,
