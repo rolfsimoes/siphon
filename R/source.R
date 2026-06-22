@@ -119,6 +119,9 @@
         },
         done = function() i == n,
         close = function() invisible(NULL),
+        item_commit = function(id, data) invisible(NULL),
+        item_abort = function(id, error = NULL, data = NULL) invisible(NULL),
+        item_release = function(id) invisible(NULL),
         backend = function() main_backend()
     )
 
@@ -176,13 +179,34 @@
 pump_source <- function(pull_fn,
                         done_fn = NULL,
                         close_fn = NULL,
-                        length = Inf) {
+                        length = Inf,
+                        item_commit_fn = NULL,
+                        item_abort_fn = NULL,
+                        item_release_fn = NULL) {
     if (!is.function(pull_fn)) stop("pull_fn must be a function")
 
     # Defaults
     done_resolved <- if (is.null(done_fn)) function() FALSE else done_fn
     close_resolved <- if (is.null(close_fn)) function() invisible(NULL) else close_fn
     length_fn <- if (is.function(length)) length else function() length
+
+    item_commit_resolved <- if (is.null(item_commit_fn)) {
+        function(id, data) invisible(NULL)
+    } else {
+        item_commit_fn
+    }
+
+    item_abort_resolved <- if (is.null(item_abort_fn)) {
+        function(id, error = NULL, data = NULL) invisible(NULL)
+    } else {
+        item_abort_fn
+    }
+
+    item_release_resolved <- if (is.null(item_release_fn)) {
+        function(id) invisible(NULL)
+    } else {
+        item_release_fn
+    }
 
     internal_ordinal <- 0L
     # polling statistics
@@ -247,6 +271,9 @@ pump_source <- function(pull_fn,
         },
         done = done_resolved,
         close = close_resolved,
+        item_commit = item_commit_resolved,
+        item_abort = item_abort_resolved,
+        item_release = item_release_resolved,
         backend = function() main_backend()
     )
     structure(self, class = "pump")
