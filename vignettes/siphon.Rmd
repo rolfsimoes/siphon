@@ -456,7 +456,7 @@ The timeout is suitable for detecting stuck jobs when running asynchronously, bu
 
 For advanced use cases, you can create custom sources that connect to external data systems (files, databases, message queues) using `pump_source()`. A custom source only requires a `pull_fn` function that returns `list(id, data, ok)` or `NULL` (where `id` must be a non-missing, scalar atomic value, and uniqueness of this identifier is the user's responsibility).
 
-For a complete example of implementing a database-backed queue source using `liteq` for long-running daemon processes, see the [Asynchronous Daemons with siphon and liteq](daemons.html) vignette (`vignette("daemons", package = "siphon")`).
+For a complete example of implementing a database-backed queue source using `liteq` for long-running daemon processes, see the [Asynchronous Daemons](daemons.html) vignette (`vignette("daemons", package = "siphon")`).
 
 ## Quick reference
 
