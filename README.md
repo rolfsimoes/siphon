@@ -3,7 +3,7 @@
 
 # siphon
 
-[![CI](https://github.com/rolfsimoes/siphon/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/rolfsimoes/siphon/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/rolfsimoes/siphon/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/rolfsimoes/siphon/actions/workflows/R-CMD-check.yaml)
 [![pkgdown](https://img.shields.io/badge/pkgdown-website-blue.svg)](https://rolfsimoes.github.io/siphon/)
 [![License:
 MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
