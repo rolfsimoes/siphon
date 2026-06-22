@@ -43,7 +43,7 @@ test_that("future_backend pipeline scheduling preserves order", {
     old_plan <- future::plan("multisession", workers = 2)
     on.exit(future::plan(old_plan), add = TRUE)
 
-    f <- 1:5 |>
+    f <- 1:20 |>
         pump(function(x) {
             Sys.sleep(0.01)
             x * 2
@@ -51,7 +51,7 @@ test_that("future_backend pipeline scheduling preserves order", {
         pump(function(x) x + 10, backend = future_backend(), max_workers = 2)
 
     out <- pump_run(f, verbose = FALSE)
-    expect_equal(out, as.list((1:5 * 2) + 10))
+    expect_equal(out, as.list((1:20 * 2) + 10))
 })
 
 test_that("future_backend two-stage ordering is preserved", {
@@ -59,11 +59,11 @@ test_that("future_backend two-stage ordering is preserved", {
     old_plan <- future::plan("multisession", workers = 2)
     on.exit(future::plan(old_plan), add = TRUE)
 
-    f <- 1:4 |>
+    f <- 1:20 |>
         pump(function(x) x + 1, backend = future_backend(), max_workers = 2) |>
         pump(function(x) x * 3, backend = future_backend(), max_workers = 2)
     out <- pump_run(f, verbose = FALSE)
-    expect_equal(out, as.list((1:4 + 1) * 3))
+    expect_equal(out, as.list((1:20 + 1) * 3))
 })
 
 test_that("future_backend print output is correct", {
@@ -102,7 +102,7 @@ test_that("future_backend works with pump_drain", {
     on.exit(future::plan(old_plan), add = TRUE)
 
     results <- list()
-    f <- 1:5 |>
+    f <- 1:20 |>
         pump(function(x) {
             Sys.sleep(0.01)
             x * 2
@@ -110,5 +110,5 @@ test_that("future_backend works with pump_drain", {
     pump_drain(f, handle_fn = function(id, data, ok) {
         results[[id]] <<- data
     }, verbose = FALSE)
-    expect_equal(results, list(2, 4, 6, 8, 10))
+    expect_equal(results, as.list(1:20 * 2))
 })

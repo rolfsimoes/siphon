@@ -27,7 +27,7 @@ test_that("mirai_backend operations work with local daemons", {
     )
 
     # 3. mirai_backend pipeline scheduling preserves order
-    f <- 1:5 |>
+    f <- 1:20 |>
         pump(function(x) {
             Sys.sleep(0.01)
             x * 2
@@ -35,14 +35,14 @@ test_that("mirai_backend operations work with local daemons", {
         pump(function(x) x + 10, backend = mirai_backend(), max_workers = 2)
 
     out <- pump_run(f, verbose = FALSE)
-    expect_equal(out, as.list((1:5 * 2) + 10))
+    expect_equal(out, as.list((1:20 * 2) + 10))
 
     # 4. mirai_backend two-stage ordering is preserved
-    f <- 1:4 |>
+    f <- 1:20 |>
         pump(function(x) x + 1, backend = mirai_backend(), max_workers = 2) |>
         pump(function(x) x * 3, backend = mirai_backend(), max_workers = 2)
     out <- pump_run(f, verbose = FALSE)
-    expect_equal(out, as.list((1:4 + 1) * 3))
+    expect_equal(out, as.list((1:20 + 1) * 3))
 
     # 5. mirai_backend print output is correct
     output <- capture.output(print(bk))
@@ -50,13 +50,13 @@ test_that("mirai_backend operations work with local daemons", {
     expect_equal(output, c("<pump_mirai_backend>", paste0("  workers: ", expected_workers)))
 
     # 6. mirai_backend processes returned error objects as data and correctly catches thrown errors
-    f1 <- 1:1 |>
+    f1 <- 1:20 |>
         pump(function(x) simpleError("returned"), backend = mirai_backend()) |>
         pump_run(verbose = FALSE, on_error = "collect")
     expect_s3_class(f1[[1]], "error")
     expect_equal(conditionMessage(f1[[1]]), "returned")
 
-    f2 <- 1:1 |>
+    f2 <- 1:20 |>
         pump(function(x) stop("thrown"), backend = mirai_backend()) |>
         pump_run(verbose = FALSE, on_error = "collect")
     expect_s3_class(f2[[1]], "error")
@@ -64,7 +64,7 @@ test_that("mirai_backend operations work with local daemons", {
 
     # 7. mirai_backend works with pump_drain
     results <- list()
-    f <- 1:5 |>
+    f <- 1:20 |>
         pump(function(x) {
             Sys.sleep(0.01)
             x * 2
@@ -72,5 +72,5 @@ test_that("mirai_backend operations work with local daemons", {
     pump_drain(f, handle_fn = function(id, data, ok) {
         results[[id]] <<- data
     }, verbose = FALSE)
-    expect_equal(results, list(2, 4, 6, 8, 10))
+    expect_equal(results, as.list(1:20 * 2))
 })
