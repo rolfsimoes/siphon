@@ -34,7 +34,7 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/daemons.html">Asynchronous Daemons with siphon and liteq</a></li>
+<li><a class="dropdown-item" href="../articles/daemons.html">Asynchronous Daemons</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -224,9 +224,7 @@ using a constructor function (recommended) or a string alias:</p>
 <tr class="odd">
 <td>Main thread</td>
 <td><code><a href="../reference/main_backend.html">main_backend()</a></code></td>
-<td>
-<code>"main"</code> or <code>"default"</code>
-</td>
+<td><code>"main"</code></td>
 <td>Runs jobs synchronously in the current R process.</td>
 </tr>
 <tr class="even">
@@ -253,6 +251,57 @@ equivalent:</p>
 <span><span class="co"># Using string alias</span></span>
 <span><span class="va">f2</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span> <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span></span></code></pre></div>
 <div class="section level3">
+<h3 id="pipeline-wide-backend-defaults">Pipeline-wide backend defaults<a class="anchor" aria-label="anchor" href="#pipeline-wide-backend-defaults"></a>
+</h3>
+<p>You can set a pipeline-wide default backend via
+<code><a href="../reference/pump_run.html">pump_run()</a></code> or <code><a href="../reference/pump_drain.html">pump_drain()</a></code>. When a stage is
+created with <code>pump(..., backend = NULL)</code> (the default), it
+inherits the backend set by <code>pump_run(..., backend = ...)</code>.
+An explicit stage-level <code>backend</code> always overrides the
+pipeline-wide default.</p>
+<p>This is useful when you want to run an entire pipeline on a specific
+backend without repeating the backend specification for each stage:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Set a pipeline-wide default backend</span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span><span class="op">)</span> <span class="op">|&gt;</span>  <span class="co"># Inherits "main" from pump_run</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="fl">10</span><span class="op">)</span> <span class="op">|&gt;</span> <span class="co"># Inherits "main" from pump_run</span></span>
+<span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>backend <span class="op">=</span> <span class="st">"main"</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">res</span><span class="op">)</span></span>
+<span><span class="co">#. [[1]]</span></span>
+<span><span class="co">#. [1] 12</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[2]]</span></span>
+<span><span class="co">#. [1] 14</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[3]]</span></span>
+<span><span class="co">#. [1] 16</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[4]]</span></span>
+<span><span class="co">#. [1] 18</span></span></code></pre></div>
+<p>You can still override the default for specific stages:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Override the default for a specific stage</span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span> <span class="op">|&gt;</span> <span class="co"># Explicit override</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="fl">10</span><span class="op">)</span> <span class="op">|&gt;</span>                  <span class="co"># Inherits "main" from pump_run</span></span>
+<span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>backend <span class="op">=</span> <span class="st">"main"</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">res</span><span class="op">)</span></span>
+<span><span class="co">#. [[1]]</span></span>
+<span><span class="co">#. [1] 12</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[2]]</span></span>
+<span><span class="co">#. [1] 14</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[3]]</span></span>
+<span><span class="co">#. [1] 16</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[4]]</span></span>
+<span><span class="co">#. [1] 18</span></span></code></pre></div>
+</div>
+<div class="section level3">
 <h3 id="worker-lifecycle-management">Worker lifecycle management<a class="anchor" aria-label="anchor" href="#worker-lifecycle-management"></a>
 </h3>
 <p>When using async backends like <code>mirai</code> or
@@ -266,7 +315,7 @@ open connections.</p>
 <code>mirai::daemons(n)</code> and shut them down with
 <code>mirai::daemons(0)</code>. Use <code><a href="https://rdrr.io/r/base/on.exit.html" class="external-link">on.exit()</a></code> for automatic
 cleanup:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"mirai"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/on.exit.html" class="external-link">on.exit</a></span><span class="op">(</span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span>, add <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -281,7 +330,7 @@ cleanup:</p>
 </h4>
 <p>For <code><a href="../reference/future_backend.html">future_backend()</a></code>, set a plan with
 <code><a href="https://future.futureverse.org/reference/plan.html" class="external-link">future::plan()</a></code> and restore the previous plan when done:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"future"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">old_plan</span> <span class="op">&lt;-</span> <span class="fu">future</span><span class="fu">::</span><span class="fu"><a href="https://future.futureverse.org/reference/plan.html" class="external-link">plan</a></span><span class="op">(</span><span class="st">"sequential"</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/on.exit.html" class="external-link">on.exit</a></span><span class="op">(</span><span class="fu">future</span><span class="fu">::</span><span class="fu"><a href="https://future.futureverse.org/reference/plan.html" class="external-link">plan</a></span><span class="op">(</span><span class="va">old_plan</span><span class="op">)</span>, add <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -314,7 +363,7 @@ upstream, propagating the pressure backward through the pipeline.</p>
 <code><a href="../reference/pump_drain.html">pump_drain()</a></code> (covered in the next section) to stream items
 and capture a snapshot mid-run, the moment the third item reaches the
 sink:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span> <span class="op">|&gt;</span></span>
@@ -345,13 +394,13 @@ sink:</p>
 <span><span class="co">#.     buffer:  0/20</span></span>
 <span><span class="co">#.     done:    3</span></span>
 <span><span class="co">#.     errors:  0</span></span>
-<span><span class="co">#.     polls:   3 hits, 11 misses (21.4% hit)</span></span>
-<span><span class="co">#.     time:    93ms (fn: 90.5ms, idle: 2.5ms)</span></span>
+<span><span class="co">#.     polls:   3 hits, 12 misses (20% hit)</span></span>
+<span><span class="co">#.     time:    92.7ms (fn: 90.5ms, idle: 2.2ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
-<span><span class="co">#.     poll_wall_time: 4.9ms</span></span>
+<span><span class="co">#.     poll_wall_time: 4.4ms</span></span>
 <span><span class="co">#.     fn:             90.8ms</span></span>
-<span><span class="co">#.     idle:           3.2ms</span></span>
+<span><span class="co">#.     idle:           2.8ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>The source holds 20 items and Stage 1 could process them almost
@@ -377,7 +426,7 @@ backpressure.</p>
 provides a memory-safe alternative to <code><a href="../reference/pump_run.html">pump_run()</a></code>. Instead
 of accumulating results in a list, it passes each item to a callback
 function as soon as it is ready:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">5</span> <span class="op">|&gt;</span> <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/pump_drain.html">pump_drain</a></span><span class="op">(</span><span class="va">f</span>, handle_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span>, <span class="va">data</span>, <span class="va">ok</span><span class="op">)</span> <span class="op">{</span></span>
@@ -430,7 +479,7 @@ the final result list.</li>
 <code>pump_run(..., on_error = ...)</code>. An explicit stage-level
 <code>on_error</code> always overrides the pipeline-wide default.</p>
 <p>Here is a fragile function that throws an error on odd numbers:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fragile_fn</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="va">x</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">2</span> <span class="op">!=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"odd number error"</span><span class="op">)</span></span>
@@ -442,7 +491,7 @@ the final result list.</li>
 </h3>
 <p>If no stage sets <code>on_error</code>, the pipeline stops on the
 first error:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -454,7 +503,7 @@ first error:</p>
 </h3>
 <p>With <code>"collect"</code>, the error objects themselves are
 preserved and returned in the result list:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_collect</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span>, on_error <span class="op">=</span> <span class="st">"collect"</span><span class="op">)</span></span>
@@ -479,7 +528,7 @@ preserved and returned in the result list:</p>
 <p>With <code>"continue"</code>, failed items are dropped entirely; the
 result list is shorter than the input but preserves the relative order
 of successful items:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_continue</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span>, on_error <span class="op">=</span> <span class="st">"continue"</span><span class="op">)</span></span>
@@ -498,7 +547,7 @@ of successful items:</p>
 <p>A stage can override the pipeline-wide default. In this example, the
 pipeline default is <code>"stop"</code>, but Stage 1 explicitly collects
 the error so Stage 2 can process it:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span>, on_error <span class="op">=</span> <span class="st">"collect"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="fl">10</span>, backend <span class="op">=</span> <span class="st">"main"</span>, on_error <span class="op">=</span> <span class="st">"stop"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -561,12 +610,23 @@ across all stages.</li>
 </h3>
 <p>Call <code><a href="../reference/pump_status.html">pump_status()</a></code> after a run to see how the pipeline
 behaved:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">5</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.sleep.html" class="external-link">Sys.sleep</a></span><span class="op">(</span><span class="fl">0.01</span><span class="op">)</span>; <span class="va">x</span> <span class="op">+</span> <span class="fl">10</span> <span class="op">}</span>, backend <span class="op">=</span> <span class="fu"><a href="../reference/mirai_backend.html">mirai_backend</a></span><span class="op">(</span><span class="op">)</span>, max_workers <span class="op">=</span> <span class="fl">2</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span>, backend <span class="op">=</span> <span class="fu"><a href="../reference/mirai_backend.html">mirai_backend</a></span><span class="op">(</span><span class="op">)</span>, max_workers <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span></span>
+<span>    <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span> </span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/Sys.sleep.html" class="external-link">Sys.sleep</a></span><span class="op">(</span><span class="fl">0.01</span><span class="op">)</span></span>
+<span>      <span class="va">x</span> <span class="op">+</span> <span class="fl">10</span></span>
+<span>    <span class="op">}</span>, </span>
+<span>    backend <span class="op">=</span> <span class="st">"mirai"</span>, </span>
+<span>    max_workers <span class="op">=</span> <span class="fl">2</span></span>
+<span>  <span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span></span>
+<span>    <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span>, </span>
+<span>    backend <span class="op">=</span> <span class="st">"mirai"</span>, </span>
+<span>    max_workers <span class="op">=</span> <span class="fl">2</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span><span class="va">f</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#. [[1]]</span></span>
@@ -602,12 +662,12 @@ behaved:</p>
 <span><span class="co">#.     done:    5</span></span>
 <span><span class="co">#.     errors:  0</span></span>
 <span><span class="co">#.     polls:   5 hits, 6 misses (45.5% hit)</span></span>
-<span><span class="co">#.     time:    2.7ms (fn: 0.1ms, idle: 2.6ms)</span></span>
+<span><span class="co">#.     time:    8.2ms (fn: 0.1ms, idle: 8.1ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
-<span><span class="co">#.     poll_wall_time: 4.9ms</span></span>
+<span><span class="co">#.     poll_wall_time: 9.7ms</span></span>
 <span><span class="co">#.     fn:             51ms</span></span>
-<span><span class="co">#.     idle:           3.6ms</span></span>
+<span><span class="co">#.     idle:           14.5ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>At a glance, the report confirms every item was pulled

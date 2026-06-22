@@ -20,6 +20,10 @@
   Add a processing stage to a pipeline
 - [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)
   : Drain a siphon pipeline
+- [`pump_item_registry()`](https://rolfsimoes.github.io/siphon/reference/pump_item_registry.md)
+  : Create an item registry for custom sources
+- [`pump_managed_source()`](https://rolfsimoes.github.io/siphon/reference/pump_managed_source.md)
+  : Create a managed custom source
 - [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
   : Run a siphon pipeline and collect results
 - [`pump_source()`](https://rolfsimoes.github.io/siphon/reference/pump_source.md)

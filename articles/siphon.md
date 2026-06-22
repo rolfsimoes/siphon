@@ -150,7 +150,7 @@ constructor function (recommended) or a string alias:
 
 | Backend | Constructor | String Alias | Description |
 |----|----|----|----|
-| Main thread | [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md) | `"main"` or `"default"` | Runs jobs synchronously in the current R process. |
+| Main thread | [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md) | `"main"` | Runs jobs synchronously in the current R process. |
 | Mirai | [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md) | `"mirai"` | Submits jobs through [`mirai::mirai()`](https://mirai.r-lib.org/reference/mirai.html). |
 | Future | [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md) | `"future"` | Submits jobs through [`future::future()`](https://future.futureverse.org/reference/future.html). |
 
@@ -165,6 +165,66 @@ f1 <- items |> pump(function(x) x * 2, backend = main_backend())
 
 # Using string alias
 f2 <- items |> pump(function(x) x * 2, backend = "main")
+```
+
+### Pipeline-wide backend defaults
+
+You can set a pipeline-wide default backend via
+[`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
+or
+[`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md).
+When a stage is created with `pump(..., backend = NULL)` (the default),
+it inherits the backend set by `pump_run(..., backend = ...)`. An
+explicit stage-level `backend` always overrides the pipeline-wide
+default.
+
+This is useful when you want to run an entire pipeline on a specific
+backend without repeating the backend specification for each stage:
+
+``` r
+
+# Set a pipeline-wide default backend
+res <- items |>
+  pump(function(x) x * 2) |>  # Inherits "main" from pump_run
+  pump(function(x) x + 10) |> # Inherits "main" from pump_run
+  pump_run(backend = "main", verbose = FALSE)
+
+print(res)
+#. [[1]]
+#. [1] 12
+#. 
+#. [[2]]
+#. [1] 14
+#. 
+#. [[3]]
+#. [1] 16
+#. 
+#. [[4]]
+#. [1] 18
+```
+
+You can still override the default for specific stages:
+
+``` r
+
+# Override the default for a specific stage
+res <- items |>
+  pump(function(x) x * 2, backend = "main") |> # Explicit override
+  pump(function(x) x + 10) |>                  # Inherits "main" from pump_run
+  pump_run(backend = "main", verbose = FALSE)
+
+print(res)
+#. [[1]]
+#. [1] 12
+#. 
+#. [[2]]
+#. [1] 14
+#. 
+#. [[3]]
+#. [1] 16
+#. 
+#. [[4]]
+#. [1] 18
 ```
 
 ### Worker lifecycle management
@@ -269,13 +329,13 @@ print(snapshot)
 #.     buffer:  0/20
 #.     done:    3
 #.     errors:  0
-#.     polls:   3 hits, 11 misses (21.4% hit)
-#.     time:    93ms (fn: 90.5ms, idle: 2.5ms)
+#.     polls:   3 hits, 12 misses (20% hit)
+#.     time:    92.7ms (fn: 90.5ms, idle: 2.2ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 4.9ms
+#.     poll_wall_time: 4.4ms
 #.     fn:             90.8ms
-#.     idle:           3.2ms
+#.     idle:           2.8ms
 
 mirai::daemons(0)
 ```
@@ -491,8 +551,19 @@ after a run to see how the pipeline behaved:
 mirai::daemons(2)
 
 f <- 1:5 |>
-  pump(function(x) { Sys.sleep(0.01); x + 10 }, backend = mirai_backend(), max_workers = 2) |>
-  pump(function(x) x * 2, backend = mirai_backend(), max_workers = 2)
+  pump(
+    function(x) { 
+      Sys.sleep(0.01)
+      x + 10
+    }, 
+    backend = "mirai", 
+    max_workers = 2
+  ) |>
+  pump(
+    function(x) x * 2, 
+    backend = "mirai", 
+    max_workers = 2
+  )
 
 pump_run(f, verbose = FALSE)
 #. [[1]]
@@ -528,12 +599,12 @@ print(pump_status(f))
 #.     done:    5
 #.     errors:  0
 #.     polls:   5 hits, 6 misses (45.5% hit)
-#.     time:    2.7ms (fn: 0.1ms, idle: 2.6ms)
+#.     time:    8.2ms (fn: 0.1ms, idle: 8.1ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 4.9ms
+#.     poll_wall_time: 9.7ms
 #.     fn:             51ms
-#.     idle:           3.6ms
+#.     idle:           14.5ms
 
 mirai::daemons(0)
 ```

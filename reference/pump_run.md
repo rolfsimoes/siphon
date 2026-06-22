@@ -7,7 +7,14 @@ original input order using internal sequential indices (idx).
 ## Usage
 
 ``` r
-pump_run(x, sleep_ms = 10, verbose = TRUE, on_error = "stop", timeout = NULL)
+pump_run(
+  x,
+  sleep_ms = 10,
+  verbose = TRUE,
+  on_error = "stop",
+  backend = "main",
+  timeout = NULL
+)
 ```
 
 ## Arguments
@@ -30,6 +37,12 @@ pump_run(x, sleep_ms = 10, verbose = TRUE, on_error = "stop", timeout = NULL)
   set their own `on_error`: `"stop"` throws on first error, `"collect"`
   propagates error objects, `"continue"` drops failed items. Defaults to
   `"stop"`.
+
+- backend:
+
+  Default backend for all stages that do not explicitly set their own
+  `backend`. Can be a backend object or one of `"main"`, `"mirai"`, or
+  `"future"`. Defaults to `"main"`.
 
 - timeout:
 

@@ -1,4 +1,4 @@
-# Asynchronous Daemons with siphon and liteq
+# Asynchronous Daemons
 
 ## Introduction
 
@@ -19,6 +19,11 @@ A robust production architecture separates concerns:
 
 This vignette demonstrates how to implement this background daemon
 pattern using `siphon` and `liteq`.
+
+What you’ll build: a background daemon that consumes a persistent queue,
+processes tasks in parallel with `siphon`, and persists results, while
+the web tier remains responsive. We use `liteq` and `mirai` as examples;
+you can swap in other queues or backends.
 
 It builds on the core concepts -
 [`pump()`](https://rolfsimoes.github.io/siphon/reference/pump.md),
@@ -48,118 +53,82 @@ results.](daemons_files/figure-html/daemon-diagram-1.png)
 A web front end enqueues jobs; a siphon daemon consumes them, processes
 in parallel, and persists results.
 
-## Step 1: A custom queue source
+## A managed liteq source
 
-We wrap `liteq` consumption in
-[`pump_source()`](https://rolfsimoes.github.io/siphon/reference/pump_source.md).
-Two design points are essential:
+First, we turn the queue into a pipeline source with commit/abort
+semantics.
 
-- **Keep the message on the main process.** A `liteq` message holds an
-  open lock connection and must *not* be serialized to a parallel
-  worker. We store each message in a main-process registry keyed by `id`
-  and send only its (JSON) payload downstream. Workers compute on plain
-  data; `ack()`/`nack()` happen later on the main process.
-- **Release resources with `close_fn`.**
-  [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
-  and
-  [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)
-  call it automatically when the pipeline finishes.
+The source consumes a message from liteq, decodes the JSON payload, and
+emits only the payload to the pipeline. The original liteq message stays
+in the main R process so siphon can acknowledge or reject it after the
+item leaves the pipeline.
 
-A daemon runs forever (`done_fn = function() FALSE`); for the runnable
-demo in Step 2 we stop when the queue drains. The factory below supports
-both:
+[`pump_managed_source()`](https://rolfsimoes.github.io/siphon/reference/pump_managed_source.md)
+is a convenience wrapper for sources that need per-item control. It
+stores the source-owned item internally, emits only serializable data,
+and calls `commit_fn()`, `abort_fn()`, and `release_fn()` at the right
+time.
 
 ``` r
 
 library(siphon)
 
-make_liteq_source <- function(queue, registry, run_forever = TRUE) {
-    pump_source(
+# Count READY messages in the queue. See "A note on liteq and parallel
+# backends" below for why this guard is required before try_consume().
+n_ready <- function(queue) {
+    msgs <- liteq::list_messages(queue)
+    if (nrow(msgs) == 0L) 0L else sum(msgs$status == "READY")
+}
+
+make_liteq_source <- function(queue, run_forever = TRUE) {
+    pump_managed_source(
         pull_fn = function() {
-            msg <- liteq::try_consume(queue)   # a liteq_message, or NULL if empty
-            if (is.null(msg)) return(NULL)
-
-            # Keep the live message on the main process so we can ack/nack it later
-            assign(as.character(msg$id), msg, envir = registry)
-
-            payload <- tryCatch(
-                jsonlite::fromJSON(msg$message),
-                error = function(e) e
-            )
-            list(
-                id = msg$id,
-                data = payload,                # only serializable data goes downstream
-                ok = !inherits(payload, "error")
-            )
+            if (n_ready(queue) < 1L) return(NULL)
+            liteq::try_consume(queue)
         },
-        done_fn = if (run_forever) function() FALSE else function() liteq::is_empty(queue),
-        close_fn = function() invisible(NULL)  # close DB handles / connections here
+
+        id_fn = function(msg) {
+            msg$id
+        },
+
+        data_fn = function(msg) {
+            jsonlite::fromJSON(msg$message)
+        },
+
+        commit_fn = function(msg, data) {
+            liteq::ack(msg)
+        },
+
+        abort_fn = function(msg, error = NULL, data = NULL) {
+            liteq::nack(msg)
+        },
+
+        done_fn = if (run_forever) {
+            function() FALSE
+        } else {
+            function() liteq::is_empty(queue)
+        }
     )
 }
 ```
 
-## Step 2: A runnable end-to-end example
+## The production daemon
 
-Let’s exercise the source against a temporary queue. We publish three
-jobs, process them in parallel, save the results, and acknowledge each
-message. This example runs if `liteq`, `mirai`, and `jsonlite` are
-installed:
-
-``` r
-
-# 1. Create a temporary queue and publish 3 jobs
-db <- tempfile(fileext = ".sqlite")
-q <- liteq::ensure_queue("jobs", db = db)
-for (x in 1:3) {
-    liteq::publish(q, title = paste0("job-", x),
-                   message = jsonlite::toJSON(list(x = x), auto_unbox = TRUE))
-}
-
-# 2. Build the pipeline: process payloads on 2 parallel workers
-registry <- new.env(parent = emptyenv())
-mirai::daemons(2)
-
-results <- list()
-pipeline <- make_liteq_source(q, registry, run_forever = FALSE) |>
-    pump(function(payload) payload$x * 10,
-         backend = mirai_backend(), max_workers = 2)
-
-# 3. Drain: save successes and ack/nack on the main process via the registry
-pump_drain(pipeline, verbose = FALSE, handle_fn = function(id, data, ok) {
-    msg <- get(as.character(id), envir = registry)
-    if (ok && !inherits(data, "error")) {
-        results[[as.character(id)]] <<- data
-        liteq::ack(msg)    # success: remove from the queue
-    } else {
-        liteq::nack(msg)   # failure: return to the queue for retry
-    }
-})
-
-mirai::daemons(0)
-
-str(results)
-```
-
-Each job’s payload `x` is multiplied by 10. The `liteq` message never
-leaves the main process - only the numeric payload is sent to a worker -
-and `ack()`/`nack()` are issued from the registry once the result comes
-back.
-
-## Step 3: The production daemon
-
-A real daemon never stops on its own. Use
-`make_liteq_source(..., run_forever = TRUE)` (the default) and wrap the
-drain in [`on.exit()`](https://rdrr.io/r/base/on.exit.html) so workers
-always shut down on interrupt or error. Because
+Next, we run it as a background daemon that continuously pulls jobs from
+the queue and processes them. The example below uses
+`run_forever = TRUE` to keep polling indefinitely,
+[`on.exit()`](https://rdrr.io/r/base/on.exit.html) to ensure clean
+shutdown, and
 [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)
-streams each item and frees its memory, the process stays bounded even
-over millions of jobs:
+to process items without growing memory over time.
 
 ``` r
 
-run_daemon <- function(db_path, queue_name = "jobs", n_workers = 4) {
+run_mirai_daemon <- function(db_path, 
+                             queue_name = "jobs", 
+                             n_workers = 4,
+                             sleep_ms = 100) {
     q <- liteq::ensure_queue(queue_name, db = db_path)
-    registry <- new.env(parent = emptyenv())
 
     save_result <- function(task_id, result) {
         # Persist to your database here
@@ -169,47 +138,185 @@ run_daemon <- function(db_path, queue_name = "jobs", n_workers = 4) {
     mirai::daemons(n_workers)
     on.exit(mirai::daemons(0), add = TRUE)   # always release workers
 
-    pipeline <- make_liteq_source(q, registry) |>
-        pump(function(payload) payload$x * 10,
-             backend = mirai_backend(), max_workers = n_workers, buffer_size = n_workers)
+    pipeline <- make_liteq_source(q) |>
+        pump(
+          function(payload) {
+            payload$x * 10
+          },
+          backend = "mirai", 
+          max_workers = n_workers, 
+          buffer_size = n_workers
+        )
 
     message("Daemon started. Polling queue: ", queue_name)
     pump_drain(
         pipeline,
         handle_fn = function(id, data, ok) {
-            msg <- get(as.character(id), envir = registry)
             if (ok && !inherits(data, "error")) {
                 save_result(id, data)
-                liteq::ack(msg)
-            } else {
-                liteq::nack(msg)
             }
         },
-        sleep_ms = 100   # backoff when the queue is empty
+        sleep_ms = sleep_ms   # backoff when the queue is empty
     )
 }
 ```
 
-**Stopping the daemon.** Because the loop is infinite, stop it with an
-interrupt (`Ctrl-C` / `SIGINT`); the
-[`on.exit()`](https://rdrr.io/r/base/on.exit.html) hook then shuts the
-`mirai` workers down cleanly. For programmatic shutdown, publish a
-sentinel “poison-pill” message whose handler flips a flag that your
-`done_fn` checks.
+> **NOTE**
+>
+> **Stopping the daemon.** Because the loop is infinite, stop it with an
+> interrupt (`Ctrl-C` / `SIGINT`); the
+> [`on.exit()`](https://rdrr.io/r/base/on.exit.html) hook then shuts the
+> `mirai` workers down cleanly. For programmatic shutdown, publish a
+> sentinel “poison-pill” message whose handler flips a flag that your
+> `done_fn` checks.
+
+## A note on `liteq` and parallel backends
+
+The `n_ready()` guard added to `pull_fn()` above is essential when
+combining `liteq` with a parallel backend
+([`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md)
+or
+[`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md)).
+
+`liteq::try_consume()` runs a crash-recovery sweep whenever it is called
+and **no `READY` message is available**. That sweep probes the lock file
+of every in-flight (`WORKING`) message and blocks on the SQLite busy
+timeout (roughly 10 seconds) for each lock still held by the live
+consumer. A parallel siphon stage deliberately keeps several messages
+`WORKING` while their jobs run on workers, so calling `try_consume()`
+during that window stalls the daemon for about 10 seconds per in-flight
+message - which looks like a hang.
+
+Guarding the call so it only consumes when a `READY` message actually
+exists avoids the crash-recovery path entirely:
+
+``` r
+
+n_ready <- function(queue) {
+    msgs <- liteq::list_messages(queue)
+    if (nrow(msgs) == 0L) 0L else sum(msgs$status == "READY")
+}
+
+pull_fn <- function() {
+    if (n_ready(queue) < 1L) return(NULL)
+    liteq::try_consume(queue)
+}
+```
+
+> **NOTE**
+>
+> Do not use `liteq::is_empty()` as this guard: it counts *all*
+> messages, including `WORKING` ones, so it stays `FALSE` while jobs are
+> in flight. Use it only for `done_fn` (the daemon is finished when no
+> messages remain at all).
+
+## Publishing messages to the daemon
+
+To send work to the daemon, publish messages to the queue from your web
+application or any other R process. Use `liteq::publish()` with both
+`title` (a descriptive label) and `message` (the JSON payload):
+
+``` r
+
+library(liteq)
+library(jsonlite)
+
+# Create or access the queue
+q <- liteq::ensure_queue("jobs", db = db_path)
+
+# Publish a job
+liteq::publish(
+  q,
+  title = "Job 1",
+  message = jsonlite::toJSON(list(x = 5), auto_unbox = TRUE)
+)
+
+# Publish multiple jobs
+liteq::publish(
+  q,
+  title = "Job 2",
+  message = jsonlite::toJSON(list(x = 10), auto_unbox = TRUE)
+)
+liteq::publish(
+  q,
+  title = "Job 3",
+  message = jsonlite::toJSON(list(x = 15), auto_unbox = TRUE)
+)
+```
+
+The daemon will consume these messages, process them in parallel, and
+call `save_result()` with the transformed data. The `title` field is
+useful for logging and debugging, while the `message` field contains the
+actual task data.
+
+## Using the registry primitive
+
+Finally, if you need manual control, use the registry directly. The
+[`pump_managed_source()`](https://rolfsimoes.github.io/siphon/reference/pump_managed_source.md)
+wrapper is built on top of
+[`pump_item_registry()`](https://rolfsimoes.github.io/siphon/reference/pump_item_registry.md),
+which stores source-owned objects by item ID. This is the same approach
+that
+[`pump_managed_source()`](https://rolfsimoes.github.io/siphon/reference/pump_managed_source.md)
+uses internally:
+
+``` r
+
+make_liteq_source <- function(queue, run_forever = TRUE) {
+    registry <- pump_item_registry()
+
+    pump_source(
+        pull_fn = function() {
+            if (n_ready(queue) < 1L) return(NULL)
+            msg <- liteq::try_consume(queue)
+            if (is.null(msg)) return(NULL)
+
+            registry$set(msg$id, msg)
+
+            payload <- tryCatch(
+                jsonlite::fromJSON(msg$message),
+                error = function(e) e
+            )
+
+            list(
+                id = msg$id,
+                data = payload,
+                ok = !inherits(payload, "error")
+            )
+        },
+
+        item_commit_fn = function(id, data) {
+            liteq::ack(registry$get(id))
+        },
+
+        item_abort_fn = function(id, error = NULL, data = NULL) {
+            liteq::nack(registry$get(id))
+        },
+
+        item_release_fn = function(id) {
+            registry$remove(id)
+        },
+
+        done_fn = if (run_forever) {
+            function() FALSE
+        } else {
+            function() liteq::is_empty(queue)
+        },
+
+        close_fn = function() {
+            registry$drain(function(id, msg) {
+                try(liteq::nack(msg), silent = TRUE)
+            })
+        }
+    )
+}
+```
 
 ## Advantages of this architecture
 
-1.  **Bounded concurrency and memory.** `max_workers` caps how many jobs
-    run at once, protecting memory and database connections. Adding
-    `buffer_size` applies buffer backpressure so the daemon stops
-    pulling from the queue when result persistence is the bottleneck
-    (see the backpressure section of the [main
-    vignette](https://rolfsimoes.github.io/siphon/articles/siphon.md)).
-2.  **Crash resilience.** A message is removed only after
-    `liteq::ack()`. If the daemon crashes mid-task, the un-acked message
-    is released by SQLite’s lock mechanism and another worker retries
-    it.
-3.  **Responsive UI.** A Shiny or Plumber front end only calls
-    `liteq::publish()` to enqueue work, which returns instantly. It can
-    then poll the database asynchronously (e.g. with a `later` loop or
-    reactive timer) to check when the job’s result has been saved.
+This architecture keeps the web tier responsive while background workers
+handle long-running tasks. It bounds resources through controlled
+concurrency and backpressure, provides reliability via commit/abort
+semantics on a persistent queue, and scales independently by tuning
+workers—regardless of which queue or parallel backend you use. These
+properties realize the separation of concerns introduced at the start.

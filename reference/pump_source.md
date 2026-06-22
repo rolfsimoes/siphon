@@ -8,7 +8,15 @@ queues, databases, or file readers to a siphon pipeline.
 ## Usage
 
 ``` r
-pump_source(pull_fn, done_fn = NULL, close_fn = NULL, length = Inf)
+pump_source(
+  pull_fn,
+  done_fn = NULL,
+  close_fn = NULL,
+  length = Inf,
+  item_commit_fn = NULL,
+  item_abort_fn = NULL,
+  item_release_fn = NULL
+)
 ```
 
 ## Arguments

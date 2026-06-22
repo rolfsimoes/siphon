@@ -11,7 +11,7 @@ pump(
   x,
   fn,
   ...,
-  backend = "main",
+  backend = NULL,
   max_workers = NULL,
   on_error = NULL,
   buffer_size = NULL
@@ -35,8 +35,11 @@ pump(
 
 - backend:
 
-  A backend object or one of `"main"`, `"default"`, `"mirai"`, or
-  `"future"`.
+  A backend object or one of `"main"`, `"mirai"`, or `"future"`. If
+  `NULL` (the default), the stage inherits the backend set by
+  [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
+  or
+  [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md).
 
 - max_workers:
 
