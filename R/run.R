@@ -100,16 +100,28 @@ pump_run <- function(x,
         if (progress) {
             utils::setTxtProgressBar(pb, x$progress())
         }
-        idx <- .pump_validate_idx(v$idx)
+        tryCatch(
+            {
+                idx <- .pump_validate_idx(v$idx)
 
-        if (idx > length(vals)) {
-            old_len <- length(vals)
-            length(vals) <- idx
-            length(assigned) <- idx
-            assigned[(old_len + 1):idx] <- FALSE
-        }
-        vals[idx] <- list(.pump_unwrap_error(v$data))
-        assigned[idx] <- TRUE
+                if (idx > length(vals)) {
+                    old_len <- length(vals)
+                    length(vals) <- idx
+                    length(assigned) <- idx
+                    assigned[(old_len + 1):idx] <- FALSE
+                }
+                vals[idx] <- list(.pump_unwrap_error(v$data))
+                assigned[idx] <- TRUE
+
+                x$item_commit(v$id, v$data)
+                x$item_release(v$id)
+            },
+            error = function(e) {
+                x$item_abort(v$id, error = e, data = v$data)
+                x$item_release(v$id)
+                stop(e)
+            }
+        )
     }
     if (progress) {
         utils::setTxtProgressBar(pb, x$pipeline_length())
@@ -162,7 +174,19 @@ pump_drain <- function(x, handle_fn, sleep_ms = 10, verbose = TRUE) {
         if (progress) {
             utils::setTxtProgressBar(pb, x$progress())
         }
-        handle_fn(v$id, .pump_unwrap_error(v$data), v$ok)
+        tryCatch(
+            {
+                handle_fn(v$id, .pump_unwrap_error(v$data), v$ok)
+                x$item_commit(v$id, v$data)
+            },
+            error = function(e) {
+                x$item_abort(v$id, error = e, data = v$data)
+                stop(e)
+            },
+            finally = {
+                x$item_release(v$id)
+            }
+        )
     }
     if (progress) {
         utils::setTxtProgressBar(pb, x$pipeline_length())
