@@ -1,0 +1,10 @@
+/doc/
+/Meta/
+.Rproj.user/
+.Rhistory
+/plan/
+README.knit.md
+README.html
+docs/
+*.Rhistory
+*.RData

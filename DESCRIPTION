@@ -1,0 +1,31 @@
+Package: siphon
+Type: Package
+Title: Pull-Based Staged Pipelines
+Version: 0.4.2
+Depends: R (>= 4.1.0)
+Authors@R: c(
+    person(
+      "Rolf", "Simoes",
+      email = "rolfsimoes@gmail.com",
+      role = c("aut", "cre")
+    )
+  )
+Author: Rolf Simoes [aut, cre]
+Maintainer: Rolf Simoes <rolfsimoes@gmail.com>
+Description: A small runtime for pull-based staged pipelines. siphon
+    connects item streams through asynchronous stages with bounded
+    slots and backend-specific execution.
+License: MIT + file LICENSE
+URL: https://github.com/rolfsimoes/siphon
+BugReports: https://github.com/rolfsimoes/siphon/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Suggests:
+    future,
+    mirai,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

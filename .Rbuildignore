@@ -1,0 +1,9 @@
+^doc$
+^Meta$
+^.*\.Rproj$
+^\.Rproj\.user$
+^plan$
+^README\.Rmd$
+^README\.html$
+^\.git
+^\.\.Rcheck$
