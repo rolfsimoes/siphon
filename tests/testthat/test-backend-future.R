@@ -1,5 +1,6 @@
 test_that("future_backend jobs execute under sequential plan", {
     skip_if_not_installed("future")
+    library(siphon)
     old_plan <- future::plan("sequential")
     on.exit(future::plan(old_plan), add = TRUE)
 
@@ -93,4 +94,21 @@ test_that("future_backend processes returned error objects as data and correctly
         pump_run(verbose = FALSE, on_error = "collect")
     expect_s3_class(f2[[1]], "error")
     expect_equal(conditionMessage(f2[[1]]), "thrown")
+})
+
+test_that("future_backend works with pump_drain", {
+    skip_if_not_installed("future")
+    old_plan <- future::plan("multisession", workers = 2)
+    on.exit(future::plan(old_plan), add = TRUE)
+
+    results <- list()
+    f <- 1:5 |>
+        pump(function(x) {
+            Sys.sleep(0.01)
+            x * 2
+        }, backend = future_backend(), max_workers = 2)
+    pump_drain(f, handle_fn = function(id, data, ok) {
+        results[[id]] <<- data
+    }, verbose = FALSE)
+    expect_equal(results, list(2, 4, 6, 8, 10))
 })

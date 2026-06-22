@@ -165,11 +165,11 @@ test_that("poll_wall_time excludes time between next_item calls", {
 
     # Tick once, sleep, tick again
     f$next_item()
-    Sys.sleep(0.3)
+    Sys.sleep(1.5) # seconds
     f$next_item()
     f$next_item()
 
     st <- pump_status(f)
     # poll_wall_time should be well under 0.3s since the sleep is between calls
-    expect_lt(st$poll_wall_time, 0.6)
+    expect_lt(st$poll_wall_time, 30) # milliseconds
 })

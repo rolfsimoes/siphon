@@ -1,5 +1,6 @@
 test_that("mirai_backend operations work with local daemons", {
     skip_if_not_installed("mirai")
+    library(siphon)
 
     # Start 2 local daemons for the duration of this test block
     mirai::daemons(2)
@@ -60,4 +61,16 @@ test_that("mirai_backend operations work with local daemons", {
         pump_run(verbose = FALSE, on_error = "collect")
     expect_s3_class(f2[[1]], "error")
     expect_equal(conditionMessage(f2[[1]]), "thrown")
+
+    # 7. mirai_backend works with pump_drain
+    results <- list()
+    f <- 1:5 |>
+        pump(function(x) {
+            Sys.sleep(0.01)
+            x * 2
+        }, backend = mirai_backend(), max_workers = 2)
+    pump_drain(f, handle_fn = function(id, data, ok) {
+        results[[id]] <<- data
+    }, verbose = FALSE)
+    expect_equal(results, list(2, 4, 6, 8, 10))
 })

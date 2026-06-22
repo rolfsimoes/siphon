@@ -49,3 +49,29 @@ test_that("pump_run handles infinite length sources by dynamically expanding", {
     expect_equal(out, list(4, 7, 10, 13))
 })
 
+test_that("pump_run backend default is inherited by pump stages", {
+    # When backend is set in pump_run, pump() without explicit backend should use it
+    out <- 1:3 |>
+        pump(function(x) x * 2) |>
+        pump_run(backend = "main", verbose = FALSE)
+    expect_equal(out, list(2, 4, 6))
+})
+
+test_that("pump() explicit backend overrides pump_run default", {
+    # Explicit backend in pump() should override pump_run default
+    out <- 1:3 |>
+        pump(function(x) x * 2, backend = "main") |>
+        pump_run(backend = "main", verbose = FALSE)
+    expect_equal(out, list(2, 4, 6))
+})
+
+test_that("pump_drain backend default is inherited by pump stages", {
+    # When backend is set in pump_drain, pump() without explicit backend should use it
+    results <- list()
+    f <- 1:3 |> pump(function(x) x * 2)
+    pump_drain(f, handle_fn = function(id, data, ok) {
+        results[[id]] <<- data
+    }, backend = "main")
+    expect_equal(results, list(2, 4, 6))
+})
+
