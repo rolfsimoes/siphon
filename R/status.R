@@ -246,54 +246,6 @@ print.pump_status <- function(x, ...) {
     invisible(x)
 }
 
-#' @export
-plot.pump_status <- function(x, ...) {
-    op <- par(mar = c(0, 0, 0, 0), xaxs = "i", yaxs = "i")
-    on.exit(par(op))
-    
-    plot.new()
-    plot.window(xlim = c(0, 1), ylim = c(0, 1))
-    
-    # Draw minimalist status bars
-    bar_y <- 0.7
-    bar_height <- 0.15
-    bar_spacing <- 0.18
-    
-    # Workers bar
-    workers_pct <- if (x$workers_limit > 0) x$workers_active / x$workers_limit else 0
-    rect(0.1, bar_y, 0.1 + workers_pct * 0.35, bar_y + bar_height, col = "#4A90E2", border = NA)
-    rect(0.1, bar_y, 0.45, bar_y + bar_height, col = "#E8E8E8", border = NA)
-    text(0.1, bar_y + bar_height + 0.03, "workers", cex = 0.7, adj = 0)
-    text(0.1, bar_y - 0.03, paste0(x$workers_active, "/", x$workers_limit), cex = 0.65, adj = 0)
-    
-    # Buffer bar
-    buffer_pct <- if (x$buffer_capacity > 0) x$buffer_size / x$buffer_capacity else 0
-    rect(0.55, bar_y, 0.55 + buffer_pct * 0.35, bar_y + bar_height, col = "#50E3C2", border = NA)
-    rect(0.55, bar_y, 0.9, bar_y + bar_height, col = "#E8E8E8", border = NA)
-    text(0.55, bar_y + bar_height + 0.03, "buffer", cex = 0.7, adj = 0)
-    text(0.55, bar_y - 0.03, paste0(x$buffer_size, "/", x$buffer_capacity), cex = 0.65, adj = 0)
-    
-    # Progress bar
-    bar_y <- bar_y - bar_spacing
-    if (x$buffer_capacity > 0) {
-        progress_pct <- min(x$completed / x$buffer_capacity, 1)
-    } else {
-        progress_pct <- 0
-    }
-    rect(0.1, bar_y, 0.1 + progress_pct * 0.8, bar_y + bar_height, col = "#F5A623", border = NA)
-    rect(0.1, bar_y, 0.9, bar_y + bar_height, col = "#E8E8E8", border = NA)
-    text(0.1, bar_y + bar_height + 0.03, "completed", cex = 0.7, adj = 0)
-    text(0.1, bar_y - 0.03, as.character(x$completed), cex = 0.65, adj = 0)
-    
-    # Errors indicator
-    if (x$errors > 0) {
-        points(0.9, bar_y + bar_height / 2, pch = 4, col = "#E74C3C", cex = 2)
-        text(0.9, bar_y - 0.03, paste0(x$errors, " errors"), cex = 0.6, adj = 1, col = "#E74C3C")
-    }
-    
-    invisible(x)
-}
-
 #' Print a pump pipeline
 #'
 #' `print.pump()` displays the status of all stages in a pipeline.
