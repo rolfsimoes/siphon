@@ -16,7 +16,7 @@ Description: A small runtime for pull-based staged pipelines. siphon
     connects item streams through asynchronous stages with bounded
     slots and backend-specific execution.
 License: MIT + file LICENSE
-URL: https://github.com/rolfsimoes/siphon
+URL: https://github.com/rolfsimoes/siphon, https://rolfsimoes.github.io/siphon/
 BugReports: https://github.com/rolfsimoes/siphon/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

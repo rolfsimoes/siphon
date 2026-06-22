@@ -7,3 +7,7 @@
 ^README\.html$
 ^\.git
 ^\.\.Rcheck$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^\.github$
