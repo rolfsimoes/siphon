@@ -70,7 +70,9 @@ A daemon runs forever (`done_fn = function() FALSE`); for the runnable demo in S
 ```{r}
 library(siphon)
 
-make_liteq_source <- function(queue, registry, run_forever = TRUE) {
+make_liteq_source <- function(queue, run_forever = TRUE) {
+    registry <- new.env(parent = emptyenv())
+
     pump_source(
         pull_fn = function() {
             msg <- liteq::try_consume(queue)   # a liteq_message, or NULL if empty
@@ -89,8 +91,25 @@ make_liteq_source <- function(queue, registry, run_forever = TRUE) {
                 ok = !inherits(payload, "error")
             )
         },
+        item_commit_fn = function(id, data) {
+            msg <- get(as.character(id), envir = registry, inherits = FALSE)
+            liteq::ack(msg)
+        },
+        item_abort_fn = function(id, error = NULL, data = NULL) {
+            msg <- get(as.character(id), envir = registry, inherits = FALSE)
+            liteq::nack(msg)
+        },
+        item_release_fn = function(id) {
+            key <- as.character(id)
+            if (exists(key, envir = registry, inherits = FALSE)) {
+                rm(list = key, envir = registry)
+            }
+        },
         done_fn = if (run_forever) function() FALSE else function() liteq::is_empty(queue),
-        close_fn = function() invisible(NULL)  # close DB handles / connections here
+        close_fn = function() {
+            rm(list = ls(envir = registry), envir = registry)
+            invisible(NULL)
+        }
     )
 }
 ```
@@ -109,22 +128,17 @@ for (x in 1:3) {
 }
 
 # 2. Build the pipeline: process payloads on 2 parallel workers
-registry <- new.env(parent = emptyenv())
 mirai::daemons(2)
 
 results <- list()
-pipeline <- make_liteq_source(q, registry, run_forever = FALSE) |>
+pipeline <- make_liteq_source(q, run_forever = FALSE) |>
     pump(function(payload) payload$x * 10,
          backend = mirai_backend(), max_workers = 2)
 
-# 3. Drain: save successes and ack/nack on the main process via the registry
+# 3. Drain: save successes; ack/nack happens automatically via lifecycle callbacks
 pump_drain(pipeline, verbose = FALSE, handle_fn = function(id, data, ok) {
-    msg <- get(as.character(id), envir = registry)
     if (ok && !inherits(data, "error")) {
         results[[as.character(id)]] <<- data
-        liteq::ack(msg)    # success: remove from the queue
-    } else {
-        liteq::nack(msg)   # failure: return to the queue for retry
     }
 })
 
@@ -133,7 +147,7 @@ mirai::daemons(0)
 str(results)
 ```
 
-Each job's payload `x` is multiplied by 10. The `liteq` message never leaves the main process - only the numeric payload is sent to a worker - and `ack()`/`nack()` are issued from the registry once the result comes back.
+Each job's payload `x` is multiplied by 10. The `liteq` message never leaves the main process - only the numeric payload is sent to a worker - and `ack()`/`nack()` are issued automatically via the item lifecycle callbacks once the result comes back.
 
 ## Step 3: The production daemon
 
@@ -142,7 +156,6 @@ A real daemon never stops on its own. Use `make_liteq_source(..., run_forever = 
 ```{r, eval = FALSE}
 run_daemon <- function(db_path, queue_name = "jobs", n_workers = 4) {
     q <- liteq::ensure_queue(queue_name, db = db_path)
-    registry <- new.env(parent = emptyenv())
 
     save_result <- function(task_id, result) {
         # Persist to your database here
@@ -152,7 +165,7 @@ run_daemon <- function(db_path, queue_name = "jobs", n_workers = 4) {
     mirai::daemons(n_workers)
     on.exit(mirai::daemons(0), add = TRUE)   # always release workers
 
-    pipeline <- make_liteq_source(q, registry) |>
+    pipeline <- make_liteq_source(q) |>
         pump(function(payload) payload$x * 10,
              backend = mirai_backend(), max_workers = n_workers, buffer_size = n_workers)
 
@@ -160,12 +173,8 @@ run_daemon <- function(db_path, queue_name = "jobs", n_workers = 4) {
     pump_drain(
         pipeline,
         handle_fn = function(id, data, ok) {
-            msg <- get(as.character(id), envir = registry)
             if (ok && !inherits(data, "error")) {
                 save_result(id, data)
-                liteq::ack(msg)
-            } else {
-                liteq::nack(msg)
             }
         },
         sleep_ms = 100   # backoff when the queue is empty
