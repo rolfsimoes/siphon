@@ -147,6 +147,8 @@ The `max_workers` parameter specifies the maximum number of active processing sl
 * **Resource management**: You can restrict concurrency for resource-constrained operations (e.g., by using the synchronous `main_backend()` or setting `max_workers = 1` on an async backend for a GPU dispatch stage to prevent duplicating contexts or competing for VRAM) while letting other stages run with higher concurrency.
 * **Backend capacity**: By default, if `max_workers` is not specified, it defaults to the worker count of the associated backend. For the synchronous `main_backend()`, `max_workers` is ignored and always forced to 1 since execution runs sequentially in the main R process.
 
+> **Note on main thread coordination:** When using `main_backend()` for stages like GPU dispatch, the main thread executes those jobs synchronously (one at a time), but it does **not** halt pipeline coordination. The main thread continues to poll and coordinate other stages between `main_backend()` job executions, so parallel stages on async backends (e.g., `mirai_backend()`) continue processing concurrently. The `main_backend()` stage itself is sequential, but the overall pipeline maintains parallelism across stages.
+
 
 ## Execution backends
 

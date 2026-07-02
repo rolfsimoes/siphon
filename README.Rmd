@@ -64,7 +64,9 @@ print(res)
 Use direct parallel map tools when the problem is simply `lapply(x, f)` with
 workers. Use `siphon` when the problem is a staged flow with different resource
 constraints per stage, such as CPU preparation, main-thread GPU dispatch, and
-parallel I/O.
+parallel I/O. Note that stages using `main_backend()` run sequentially on the
+main thread but do not block pipeline coordination-other stages on async
+backends continue processing in parallel.
 
 See the `vignette("siphon")` for a longer introduction with error handling and
 status inspection examples.
