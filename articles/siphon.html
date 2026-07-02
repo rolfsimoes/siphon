@@ -199,6 +199,18 @@ count of the associated backend. For the synchronous
 always forced to 1 since execution runs sequentially in the main R
 process.</li>
 </ul>
+<blockquote>
+<p><strong>Note on main thread coordination:</strong> When using
+<code><a href="../reference/main_backend.html">main_backend()</a></code> for stages like GPU dispatch, the main
+thread executes those jobs synchronously (one at a time), but it does
+<strong>not</strong> halt pipeline coordination. The main thread
+continues to poll and coordinate other stages between
+<code><a href="../reference/main_backend.html">main_backend()</a></code> job executions, so parallel stages on async
+backends (e.g., <code><a href="../reference/mirai_backend.html">mirai_backend()</a></code>) continue processing
+concurrently. The <code><a href="../reference/main_backend.html">main_backend()</a></code> stage itself is
+sequential, but the overall pipeline maintains parallelism across
+stages.</p>
+</blockquote>
 </div>
 </div>
 <div class="section level2">
@@ -394,13 +406,13 @@ sink:</p>
 <span><span class="co">#.     buffer:  0/20</span></span>
 <span><span class="co">#.     done:    3</span></span>
 <span><span class="co">#.     errors:  0</span></span>
-<span><span class="co">#.     polls:   3 hits, 10 misses (23.1% hit)</span></span>
-<span><span class="co">#.     time:    92.3ms (fn: 90.4ms, idle: 1.9ms)</span></span>
+<span><span class="co">#.     polls:   3 hits, 12 misses (20% hit)</span></span>
+<span><span class="co">#.     time:    92.4ms (fn: 90.5ms, idle: 1.9ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
-<span><span class="co">#.     poll_wall_time: 4.1ms</span></span>
+<span><span class="co">#.     poll_wall_time: 3.7ms</span></span>
 <span><span class="co">#.     fn:             90.8ms</span></span>
-<span><span class="co">#.     idle:           2.3ms</span></span>
+<span><span class="co">#.     idle:           2.4ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>The source holds 20 items and Stage 1 could process them almost
@@ -662,12 +674,12 @@ behaved:</p>
 <span><span class="co">#.     done:    5</span></span>
 <span><span class="co">#.     errors:  0</span></span>
 <span><span class="co">#.     polls:   5 hits, 6 misses (45.5% hit)</span></span>
-<span><span class="co">#.     time:    6.2ms (fn: 0.1ms, idle: 6.1ms)</span></span>
+<span><span class="co">#.     time:    1.8ms (fn: 0.1ms, idle: 1.7ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
-<span><span class="co">#.     poll_wall_time: 8.2ms</span></span>
-<span><span class="co">#.     fn:             51.1ms</span></span>
-<span><span class="co">#.     idle:           10.8ms</span></span>
+<span><span class="co">#.     poll_wall_time: 3.3ms</span></span>
+<span><span class="co">#.     fn:             50.9ms</span></span>
+<span><span class="co">#.     idle:           2.3ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>At a glance, the report confirms every item was pulled

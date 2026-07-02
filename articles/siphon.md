@@ -142,6 +142,20 @@ processing slots (concurrent jobs) allowed for a stage at any one time.
   `max_workers` is ignored and always forced to 1 since execution runs
   sequentially in the main R process.
 
+> **Note on main thread coordination:** When using
+> [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md)
+> for stages like GPU dispatch, the main thread executes those jobs
+> synchronously (one at a time), but it does **not** halt pipeline
+> coordination. The main thread continues to poll and coordinate other
+> stages between
+> [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md)
+> job executions, so parallel stages on async backends (e.g.,
+> [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md))
+> continue processing concurrently. The
+> [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md)
+> stage itself is sequential, but the overall pipeline maintains
+> parallelism across stages.
+
 ## Execution backends
 
 `siphon` supports multiple execution backends to run jobs in parallel or
@@ -329,13 +343,13 @@ print(snapshot)
 #.     buffer:  0/20
 #.     done:    3
 #.     errors:  0
-#.     polls:   3 hits, 10 misses (23.1% hit)
-#.     time:    92.3ms (fn: 90.4ms, idle: 1.9ms)
+#.     polls:   3 hits, 12 misses (20% hit)
+#.     time:    92.4ms (fn: 90.5ms, idle: 1.9ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 4.1ms
+#.     poll_wall_time: 3.7ms
 #.     fn:             90.8ms
-#.     idle:           2.3ms
+#.     idle:           2.4ms
 
 mirai::daemons(0)
 ```
@@ -599,12 +613,12 @@ print(pump_status(f))
 #.     done:    5
 #.     errors:  0
 #.     polls:   5 hits, 6 misses (45.5% hit)
-#.     time:    6.2ms (fn: 0.1ms, idle: 6.1ms)
+#.     time:    1.8ms (fn: 0.1ms, idle: 1.7ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 8.2ms
-#.     fn:             51.1ms
-#.     idle:           10.8ms
+#.     poll_wall_time: 3.3ms
+#.     fn:             50.9ms
+#.     idle:           2.3ms
 
 mirai::daemons(0)
 ```
