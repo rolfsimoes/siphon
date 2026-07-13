@@ -74,3 +74,44 @@ test_that("mirai_backend operations work with local daemons", {
     }, verbose = FALSE)
     expect_equal(results, as.list(1:20 * 2))
 })
+
+# Boundary contract: fault tolerance is delegated to mirai, but siphon must
+# surface a dead daemon as a pump_error value instead of leaking a raw
+# errorValue into the pipeline.
+test_that("mirai_backend surfaces daemon death as a pump_error", {
+    skip_if_not_installed("mirai")
+    skip_on_cran()
+    skip_on_os("windows")
+    mirai::daemons(2)
+    on.exit(mirai::daemons(0), add = TRUE)
+
+    # adapter level
+    bk <- mirai_backend()
+    job <- siphon:::.pump_executor_new_job(
+        bk,
+        function(x) {
+            tools::pskill(Sys.getpid())
+            Sys.sleep(30)
+        },
+        list(1)
+    )
+    for (i in 1:100) {
+        if (siphon:::.pump_job_is_ready(job)) break
+        Sys.sleep(0.1)
+    }
+    expect_true(siphon:::.pump_job_is_ready(job))
+    result <- siphon:::.pump_job_data(job)
+    expect_s3_class(result$value, "pump_error")
+    expect_match(conditionMessage(result$value), "mirai worker failed")
+
+    # pipeline level: the error is collectable, the pipeline does not abort
+    out <- 1:1 |>
+        pump(function(x) {
+            tools::pskill(Sys.getpid())
+            Sys.sleep(30)
+        }, backend = mirai_backend()) |>
+        pump_run(verbose = FALSE, on_error = "collect")
+    # pump_run strips the internal pump_error class before returning
+    expect_s3_class(out[[1]], "error")
+    expect_match(conditionMessage(out[[1]]), "mirai worker failed")
+})
