@@ -67,8 +67,10 @@ print(res)
 
 - **Pull-based staged pipelines** - Items move to downstream stages as
   soon as they are ready, without waiting for upstream completion
-- **Multiple execution backends** - Support for main thread, mirai, and
-  future backends
+- **Multiple execution backends** - Support for main thread, mirai,
+  future, and parallel (PSOCK) backends
+- **Fault-tolerant execution** - `parallel_backend()` replaces crashed
+  workers and resubmits their jobs (at-least-once semantics)
 - **Backpressure control** - Bounded buffers with `buffer_size` to limit
   memory usage
 - **Concurrency control** - Per-stage `max_workers` to manage resource
@@ -88,7 +90,10 @@ print(res)
 Use direct parallel map tools when the problem is simply `lapply(x, f)`
 with workers. Use `siphon` when the problem is a staged flow with
 different resource constraints per stage, such as CPU preparation,
-main-thread GPU dispatch, and parallel I/O.
+main-thread GPU dispatch, and parallel I/O. Note that stages using
+`main_backend()` run sequentially on the main thread but do not block
+pipeline coordination-other stages on async backends continue processing
+in parallel.
 
 See the `vignette("siphon")` for a longer introduction with error
 handling and status inspection examples.
