@@ -51,7 +51,8 @@ print(res)
 ## Features
 
 - **Pull-based staged pipelines** - Items move to downstream stages as soon as they are ready, without waiting for upstream completion
-- **Multiple execution backends** - Support for main thread, mirai, and future backends
+- **Multiple execution backends** - Support for main thread, mirai, future, and parallel (PSOCK) backends
+- **Fault-tolerant execution** - `parallel_backend()` replaces crashed workers and resubmits their jobs (at-least-once semantics)
 - **Backpressure control** - Bounded buffers with `buffer_size` to limit memory usage
 - **Concurrency control** - Per-stage `max_workers` to manage resource constraints
 - **Error handling** - Flexible error policies: `"collect"`, `"stop"`, or `"continue"`
