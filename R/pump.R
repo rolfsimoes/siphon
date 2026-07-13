@@ -393,6 +393,12 @@ pump <- function(x,
     } else {
         max_workers <- as.integer(max(1L, max_workers))
     }
+    if (max_workers > .pump_executor_count(backend)) {
+        stop(
+            "max_workers (", max_workers, ") exceeds executor count (",
+            .pump_executor_count(backend), ") for backend"
+        )
+    }
     
     # Compute buffer_size
     if (is.null(buffer_size)) {
