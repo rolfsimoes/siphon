@@ -17,6 +17,13 @@ available slots is read from \code{future::nbrOfWorkers()}.
 Note: When using future_backend(), you are responsible for managing
 the future plan lifecycle. Call \code{future::plan()} to set a plan and restore
 the previous plan when done. See the vignette for examples.
+
+Fault tolerance is delegated to the \code{future} framework: this backend
+performs no retries. If a worker dies while running a job, the
+resulting \code{FutureError} is surfaced as a \code{pump_error} value for that
+item (subject to the \code{on_error} policy) rather than aborting the
+pipeline. For siphon-managed recovery with retries, see
+\code{\link[=parallel_backend]{parallel_backend()}}.
 }
 \examples{
 if (requireNamespace("future", quietly = TRUE)) {
