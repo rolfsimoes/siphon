@@ -7,6 +7,13 @@
 #'   the mirai daemon lifecycle. Call `mirai::daemons(n)` to start workers and
 #'   `mirai::daemons(0)` to shut them down. See the vignette for examples.
 #'
+#'   Fault tolerance is delegated to the `mirai` framework: this backend
+#'   performs no retries. If a daemon dies while running a job, the
+#'   resulting `errorValue` is surfaced as a `pump_error` value for that
+#'   item (subject to the `on_error` policy) rather than leaking into the
+#'   pipeline. For siphon-managed recovery with retries, see
+#'   [parallel_backend()].
+#'
 #' @return A backend object.
 #' @examples
 #' if (requireNamespace("mirai", quietly = TRUE) &&
@@ -45,7 +52,21 @@ mirai_backend <- function() {
 }
 #' @export
 .pump_job_data.pump_mirai_job <- function(job) {
-    if (!mirai::unresolved(job$result)) job$result[]
+    if (mirai::unresolved(job$result)) {
+        return(NULL)
+    }
+    res <- job$result[]
+    if (mirai::is_error_value(res)) {
+        msg <- if (is.numeric(res)) {
+            nanonext::nng_error(as.integer(res))
+        } else {
+            as.character(res)
+        }
+        err <- simpleError(paste0("mirai worker failed: ", msg))
+        class(err) <- c("pump_error", class(err))
+        res <- list(value = err, fn_time = 0)
+    }
+    res
 }
 
 #' Print a mirai backend
