@@ -159,6 +159,7 @@ The `max_workers` parameter specifies the maximum number of active processing sl
 | Main thread | `main_backend()` | `"main"` | Runs jobs synchronously in the current R process. |
 | Mirai | `mirai_backend()` | `"mirai"` | Submits jobs through `mirai::mirai()`. |
 | Future | `future_backend()` | `"future"` | Submits jobs through `future::future()`. |
+| Parallel | `parallel_backend(workers)` | — | Owns a PSOCK cluster with fault tolerance to worker failures: crashed workers are replaced and their jobs resubmitted (see `?parallel_backend`). No string alias, since it requires a `workers` argument. |
 
 Both styles are valid, and string aliases are automatically resolved internally. For instance, the following two specifications are equivalent:
 
@@ -231,6 +232,24 @@ if (requireNamespace("future", quietly = TRUE)) {
     pump_run(verbose = FALSE)
 }
 ```
+
+### Fault-tolerant execution with `parallel_backend()`
+
+Unlike the other backends, `parallel_backend()` owns its PSOCK cluster. If a worker process dies mid-job, the backend replaces the node with a fresh one, replays any setup expressions registered with `parallel_setup_workers()`, and resubmits the job, up to `retries` times. Because failed jobs are resubmitted, execution follows at-least-once semantics: job functions with side effects should be idempotent. The cluster is created when the backend is constructed and must be released with `parallel_stop()`:
+
+```{r}
+bk <- parallel_backend(2, retries = 3)
+parallel_setup_workers(bk, offset <- 100)
+
+res <- items |>
+  pump(function(x) x + offset, backend = bk) |>
+  pump_run(verbose = FALSE)
+
+print(res)
+parallel_stop(bk)
+```
+
+See `?parallel_backend` for the full fault-tolerance contract, including what is *not* handled (hung workers and failures of the main R process).
 
 ## Backpressure and `buffer_size`
 
