@@ -112,3 +112,56 @@ test_that("future_backend works with pump_drain", {
     }, verbose = FALSE)
     expect_equal(results, as.list(1:20 * 2))
 })
+
+# Boundary contract: fault tolerance is delegated to future, but siphon must
+# surface a dead worker as a pump_error value instead of aborting/hanging.
+test_that("future_backend surfaces worker death as a pump_error", {
+    skip_if_not_installed("future")
+    skip_on_cran()
+    skip_on_os("windows")
+    old_plan <- future::plan("multisession", workers = 2)
+    on.exit(
+        {
+            future::plan(old_plan)
+            # the killed workers leave orphaned socket connections behind;
+            # close them explicitly so GC does not warn about them later
+            cons <- showConnections()
+            orphaned <- as.integer(
+                rownames(cons)[startsWith(cons[, "description"], "<-localhost:")]
+            )
+            for (con in orphaned) {
+                try(close(getConnection(con)), silent = TRUE)
+            }
+        },
+        add = TRUE
+    )
+
+    # adapter level
+    bk <- future_backend()
+    job <- siphon:::.pump_executor_new_job(
+        bk,
+        function(x) {
+            tools::pskill(Sys.getpid())
+            Sys.sleep(30)
+        },
+        list(1)
+    )
+    for (i in 1:100) {
+        if (siphon:::.pump_job_is_ready(job)) break
+        Sys.sleep(0.1)
+    }
+    expect_true(siphon:::.pump_job_is_ready(job))
+    result <- siphon:::.pump_job_data(job)
+    expect_s3_class(result$value, "pump_error")
+    expect_s3_class(result$value, "FutureError")
+
+    # pipeline level: the error is collectable, the pipeline does not abort
+    out <- 1:1 |>
+        pump(function(x) {
+            tools::pskill(Sys.getpid())
+            Sys.sleep(30)
+        }, backend = future_backend()) |>
+        pump_run(verbose = FALSE, on_error = "collect")
+    # pump_run strips the internal pump_error class before returning
+    expect_s3_class(out[[1]], "FutureError")
+})
