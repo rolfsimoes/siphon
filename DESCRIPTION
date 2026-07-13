@@ -26,6 +26,8 @@ Suggests:
     knitr,
     liteq,
     mirai,
+    nanonext,
+    parallel,
     rmarkdown,
     testthat (>= 3.0.0)
 VignetteBuilder: knitr
