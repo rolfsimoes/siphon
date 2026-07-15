@@ -13,14 +13,15 @@
 #'   Defaults to `"stop"`.
 #' @param backend Default backend for all stages that do not explicitly set
 #'   their own `backend`. Can be a backend object or one of `"main"`,
-#'   `"mirai"`, or `"future"`. Defaults to `"main"`.
+#'   `"mirai"`, or `"future"`. Use `parallel_backend()` directly for
+#'   fault-tolerant PSOCK execution (no string alias). Defaults to `"main"`.
 #' @param timeout Maximum time in seconds to wait for completion. If
 #'   NULL (default), waits indefinitely. If exceeded, throws an error.
 #'
 #' @details The timeout parameter is checked cooperatively between polling
 #'   iterations on the main R thread. Because of this, it only works when using
-#'   asynchronous backends (such as `mirai_backend()` or `future_backend()` with
-#'   a parallel plan) that return control to the main loop. If using a
+#'   asynchronous backends (such as `mirai_backend()`, `future_backend()` with
+#'   a parallel plan, or `parallel_backend()`) that return control to the main loop. If using a
 #'   synchronous backend (like `main_backend()`), a job stuck in an infinite
 #'   loop or blocking operation will freeze the thread and prevent the timeout
 #'   from being checked. Furthermore, the timeout cannot interrupt blocking
@@ -151,7 +152,8 @@ pump_run <- function(x,
 #' @param verbose If `TRUE`, show a text progress bar.
 #' @param backend Default backend for all stages that do not explicitly set
 #'   their own `backend`. Can be a backend object or one of `"main"`,
-#'   `"mirai"`, or `"future"`. Defaults to `"main"`.
+#'   `"mirai"`, or `"future"`. Use `parallel_backend()` directly for
+#'   fault-tolerant PSOCK execution (no string alias). Defaults to `"main"`.
 #'
 #' @return Invisible `NULL`.
 #' @examples

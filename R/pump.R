@@ -323,8 +323,9 @@
 #' @param fn A function. It receives one item as its first argument.
 #' @param ... Additional arguments passed to `fn`.
 #' @param backend A backend object or one of `"main"`, `"mirai"`,
-#'   or `"future"`. If `NULL` (the default), the stage inherits the backend
-#'   set by `pump_run()` or `pump_drain()`.
+#'   or `"future"`. Use `parallel_backend()` directly for fault-tolerant
+#'   PSOCK execution (no string alias). If `NULL` (the default), the stage
+#'   inherits the backend set by `pump_run()` or `pump_drain()`.
 #' @param max_workers Maximum number of active jobs for this stage. Defaults to the
 #'   backend worker count. Ignored for the synchronous `main_backend()` (which always uses 1).
 #' @param on_error How to handle item errors: `"stop"` throws on first error,
