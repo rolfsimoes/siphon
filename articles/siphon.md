@@ -373,7 +373,7 @@ stage2 <- unique(vapply(res, function(v) v[["stage2_pid"]], numeric(1)))
 
 # often non-empty: nodes are pooled, not bound to a stage
 intersect(stage1, stage2)
-#. [1] 7577
+#. [1] 7437
 parallel_stop(bk)
 ```
 
@@ -484,12 +484,12 @@ print(snapshot)
 #.     buffer:  0/20
 #.     done:    3
 #.     errors:  0
-#.     polls:   3 hits, 11 misses (21.4% hit)
-#.     time:    92.8ms (fn: 90.5ms, idle: 2.3ms)
+#.     polls:   3 hits, 12 misses (20% hit)
+#.     time:    93ms (fn: 90.6ms, idle: 2.4ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 4.7ms
-#.     fn:             90.8ms
+#.     poll_wall_time: 5ms
+#.     fn:             91.1ms
 #.     idle:           2.9ms
 
 mirai::daemons(0)
@@ -754,12 +754,12 @@ print(pump_status(f))
 #.     done:    5
 #.     errors:  0
 #.     polls:   5 hits, 6 misses (45.5% hit)
-#.     time:    2.8ms (fn: 0.1ms, idle: 2.7ms)
+#.     time:    2.7ms (fn: 0.1ms, idle: 2.6ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 4.9ms
+#.     poll_wall_time: 4.5ms
 #.     fn:             51.1ms
-#.     idle:           3.7ms
+#.     idle:           3.6ms
 
 mirai::daemons(0)
 ```

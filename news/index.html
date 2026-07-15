@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,9 @@
 
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="development version" id="siphon-development-version">siphon (development version)<a class="anchor" aria-label="anchor" href="#siphon-development-version"></a></h2>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.5.0" id="siphon-050">siphon 0.5.0<a class="anchor" aria-label="anchor" href="#siphon-050"></a></h2>
 <ul><li>Added <code><a href="../reference/parallel_eval_workers.html">parallel_eval_workers()</a></code>, an equivalent of <code><a href="https://rdrr.io/r/parallel/clusterApply.html" class="external-link">parallel::clusterEvalQ()</a></code> for parallel backends: evaluates an expression in the global environment of every worker and returns the per-worker results. Supports injecting values from the calling frame with <code>{{ }}</code>, like <code><a href="../reference/parallel_setup_workers.html">parallel_setup_workers()</a></code>. Unlike setup expressions, evaluations are not recorded for replay on replacement nodes.</li>
 <li>Corrected <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> documentation: one backend <strong>can</strong> be shared across multiple <code><a href="../reference/pump.html">pump()</a></code> stages — results are received per node and cannot cross-wire. The requirement is that the <code>max_workers</code> of the sharing stages sum to at most the worker count (each stage defaults to the full count, so set it explicitly). Documented with an example and covered by tests, including the failure mode when the pool is oversubscribed.</li>
 <li>New vignette section “Pooling strategies: one shared pool or isolated pools” documenting when to share one <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> across stages versus creating a separate backend per stage to isolate worker pools (job placement, worker state, and sizing trade-offs).</li>

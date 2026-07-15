@@ -2,6 +2,8 @@
 
 ## siphon (development version)
 
+## siphon 0.5.0
+
 - Added
   [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md),
   an equivalent of
