@@ -23,8 +23,9 @@ implicitly wrapped as a basic source.}
 \item{...}{Additional arguments passed to \code{fn}.}
 
 \item{backend}{A backend object or one of \code{"main"}, \code{"mirai"},
-or \code{"future"}. If \code{NULL} (the default), the stage inherits the backend
-set by \code{pump_run()} or \code{pump_drain()}.}
+or \code{"future"}. Use \code{parallel_backend()} directly for fault-tolerant
+PSOCK execution (no string alias). If \code{NULL} (the default), the stage
+inherits the backend set by \code{pump_run()} or \code{pump_drain()}.}
 
 \item{max_workers}{Maximum number of active jobs for this stage. Defaults to the
 backend worker count. Ignored for the synchronous \code{main_backend()} (which always uses 1).}

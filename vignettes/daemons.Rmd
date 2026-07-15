@@ -158,7 +158,7 @@ run_mirai_daemon <- function(db_path,
 
 ## A note on `liteq` and parallel backends
 
-The `n_ready()` guard added to `pull_fn()` above is essential when combining `liteq` with a parallel backend (`mirai_backend()` or `future_backend()`).
+The `n_ready()` guard added to `pull_fn()` above is essential when combining `liteq` with a parallel backend (`mirai_backend()`, `future_backend()`, or `parallel_backend()`).
 
 `liteq::try_consume()` runs a crash-recovery sweep whenever it is called and **no `READY` message is available**. That sweep probes the lock file of every in-flight (`WORKING`) message and blocks on the SQLite busy timeout (roughly 10 seconds) for each lock still held by the live consumer. A parallel siphon stage deliberately keeps several messages `WORKING` while their jobs run on workers, so calling `try_consume()` during that window stalls the daemon for about 10 seconds per in-flight message - which looks like a hang.
 

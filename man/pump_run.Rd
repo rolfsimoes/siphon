@@ -27,7 +27,8 @@ Defaults to \code{"stop"}.}
 
 \item{backend}{Default backend for all stages that do not explicitly set
 their own \code{backend}. Can be a backend object or one of \code{"main"},
-\code{"mirai"}, or \code{"future"}. Defaults to \code{"main"}.}
+\code{"mirai"}, or \code{"future"}. Use \code{parallel_backend()} directly for
+fault-tolerant PSOCK execution (no string alias). Defaults to \code{"main"}.}
 
 \item{timeout}{Maximum time in seconds to wait for completion. If
 NULL (default), waits indefinitely. If exceeded, throws an error.}
@@ -44,8 +45,8 @@ order using internal sequential indices (idx).
 \details{
 The timeout parameter is checked cooperatively between polling
 iterations on the main R thread. Because of this, it only works when using
-asynchronous backends (such as \code{mirai_backend()} or \code{future_backend()} with
-a parallel plan) that return control to the main loop. If using a
+asynchronous backends (such as \code{mirai_backend()}, \code{future_backend()} with
+a parallel plan, or \code{parallel_backend()}) that return control to the main loop. If using a
 synchronous backend (like \code{main_backend()}), a job stuck in an infinite
 loop or blocking operation will freeze the thread and prevent the timeout
 from being checked. Furthermore, the timeout cannot interrupt blocking

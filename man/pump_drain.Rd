@@ -18,7 +18,8 @@ called for each completed item.}
 
 \item{backend}{Default backend for all stages that do not explicitly set
 their own \code{backend}. Can be a backend object or one of \code{"main"},
-\code{"mirai"}, or \code{"future"}. Defaults to \code{"main"}.}
+\code{"mirai"}, or \code{"future"}. Use \code{parallel_backend()} directly for
+fault-tolerant PSOCK execution (no string alias). Defaults to \code{"main"}.}
 }
 \value{
 Invisible \code{NULL}.
