@@ -80,8 +80,9 @@ implicitly wrapped as a basic source.</p></dd>
 
 <dt id="arg-backend">backend<a class="anchor" aria-label="anchor" href="#arg-backend"></a></dt>
 <dd><p>A backend object or one of <code>"main"</code>, <code>"mirai"</code>,
-or <code>"future"</code>. If <code>NULL</code> (the default), the stage inherits the backend
-set by <code><a href="pump_run.html">pump_run()</a></code> or <code><a href="pump_drain.html">pump_drain()</a></code>.</p></dd>
+or <code>"future"</code>. Use <code><a href="parallel_backend.html">parallel_backend()</a></code> directly for fault-tolerant
+PSOCK execution (no string alias). If <code>NULL</code> (the default), the stage
+inherits the backend set by <code><a href="pump_run.html">pump_run()</a></code> or <code><a href="pump_drain.html">pump_drain()</a></code>.</p></dd>
 
 
 <dt id="arg-max-workers">max_workers<a class="anchor" aria-label="anchor" href="#arg-max-workers"></a></dt>
@@ -157,7 +158,7 @@ backend worker count. Ignored for the synchronous <code><a href="main_backend.ht
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

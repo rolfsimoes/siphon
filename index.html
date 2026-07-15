@@ -105,7 +105,9 @@
 <li>
 <strong>Pull-based staged pipelines</strong> - Items move to downstream stages as soon as they are ready, without waiting for upstream completion</li>
 <li>
-<strong>Multiple execution backends</strong> - Support for main thread, mirai, and future backends</li>
+<strong>Multiple execution backends</strong> - Support for main thread, mirai, future, and parallel (PSOCK) backends</li>
+<li>
+<strong>Fault-tolerant execution</strong> - <code><a href="reference/parallel_backend.html">parallel_backend()</a></code> replaces crashed workers and resubmits their jobs (at-least-once semantics)</li>
 <li>
 <strong>Backpressure control</strong> - Bounded buffers with <code>buffer_size</code> to limit memory usage</li>
 <li>
@@ -124,7 +126,7 @@
 <li>
 <strong>Streaming drain</strong> - <code><a href="reference/pump_drain.html">pump_drain()</a></code> for memory-safe daemon-style processing</li>
 </ul>
-<p>Use direct parallel map tools when the problem is simply <code>lapply(x, f)</code> with workers. Use <code>siphon</code> when the problem is a staged flow with different resource constraints per stage, such as CPU preparation, main-thread GPU dispatch, and parallel I/O.</p>
+<p>Use direct parallel map tools when the problem is simply <code>lapply(x, f)</code> with workers. Use <code>siphon</code> when the problem is a staged flow with different resource constraints per stage, such as CPU preparation, main-thread GPU dispatch, and parallel I/O. Note that stages using <code><a href="reference/main_backend.html">main_backend()</a></code> run sequentially on the main thread but do not block pipeline coordination-other stages on async backends continue processing in parallel.</p>
 <p>See the <code><a href="articles/siphon.html">vignette("siphon")</a></code> for a longer introduction with error handling and status inspection examples.</p>
 </div>
 </div>
@@ -171,7 +173,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

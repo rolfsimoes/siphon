@@ -23,6 +23,13 @@ future plan lifecycle. Call
 to set a plan and restore the previous plan when done. See the vignette
 for examples.
 
+Fault tolerance is delegated to the `future` framework: this backend
+performs no retries. If a worker dies while running a job, the resulting
+`FutureError` is surfaced as a `pump_error` value for that item (subject
+to the `on_error` policy) rather than aborting the pipeline. For
+siphon-managed recovery with retries, see
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md).
+
 ## Examples
 
 ``` r

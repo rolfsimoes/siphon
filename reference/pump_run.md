@@ -42,7 +42,10 @@ pump_run(
 
   Default backend for all stages that do not explicitly set their own
   `backend`. Can be a backend object or one of `"main"`, `"mirai"`, or
-  `"future"`. Defaults to `"main"`.
+  `"future"`. Use
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  directly for fault-tolerant PSOCK execution (no string alias).
+  Defaults to `"main"`.
 
 - timeout:
 
@@ -59,11 +62,12 @@ are omitted entirely; the result may be shorter than the input.
 The timeout parameter is checked cooperatively between polling
 iterations on the main R thread. Because of this, it only works when
 using asynchronous backends (such as
-[`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md)
-or
+[`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md),
 [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md)
-with a parallel plan) that return control to the main loop. If using a
-synchronous backend (like
+with a parallel plan, or
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md))
+that return control to the main loop. If using a synchronous backend
+(like
 [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md)),
 a job stuck in an infinite loop or blocking operation will freeze the
 thread and prevent the timeout from being checked. Furthermore, the

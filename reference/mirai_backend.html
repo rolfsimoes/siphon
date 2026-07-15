@@ -59,6 +59,12 @@ available slots is read from <code>mirai::status()$connections</code>.</p>
     <p>Note: When using mirai_backend(), you are responsible for managing
 the mirai daemon lifecycle. Call <code>mirai::daemons(n)</code> to start workers and
 <code>mirai::daemons(0)</code> to shut them down. See the vignette for examples.</p>
+<p>Fault tolerance is delegated to the <code>mirai</code> framework: this backend
+performs no retries. If a daemon dies while running a job, the
+resulting <code>errorValue</code> is surfaced as a <code>pump_error</code> value for that
+item (subject to the <code>on_error</code> policy) rather than leaking into the
+pipeline. For siphon-managed recovery with retries, see
+<code><a href="parallel_backend.html">parallel_backend()</a></code>.</p>
     </div>
 
     <div class="section level2">
@@ -80,7 +86,7 @@ the mirai daemon lifecycle. Call <code>mirai::daemons(n)</code> to start workers
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

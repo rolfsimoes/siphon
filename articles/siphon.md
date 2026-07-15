@@ -167,6 +167,7 @@ constructor function (recommended) or a string alias:
 | Main thread | [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md) | `"main"` | Runs jobs synchronously in the current R process. |
 | Mirai | [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md) | `"mirai"` | Submits jobs through [`mirai::mirai()`](https://mirai.r-lib.org/reference/mirai.html). |
 | Future | [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md) | `"future"` | Submits jobs through [`future::future()`](https://future.futureverse.org/reference/future.html). |
+| Parallel | `parallel_backend(workers)` | — | Owns a PSOCK cluster with fault tolerance to worker failures: crashed workers are replaced and their jobs resubmitted (see [`?parallel_backend`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)). No string alias, since it requires a `workers` argument. |
 
 Both styles are valid, and string aliases are automatically resolved
 internally. For instance, the following two specifications are
@@ -243,9 +244,9 @@ print(res)
 
 ### Worker lifecycle management
 
-When using async backends like `mirai` or `future`, you are responsible
-for managing the worker lifecycle. Failing to shut down workers can
-leave zombie processes or open connections.
+When using async backends like `mirai`, `future`, or `parallel`, you are
+responsible for managing the worker lifecycle. Failing to shut down
+workers can leave zombie processes or open connections.
 
 #### Mirai
 
@@ -287,6 +288,146 @@ if (requireNamespace("future", quietly = TRUE)) {
     pump_run(verbose = FALSE)
 }
 ```
+
+### Fault-tolerant execution with `parallel_backend()`
+
+Unlike the other backends,
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+owns its PSOCK cluster. If a worker process dies mid-job, the backend
+replaces the node with a fresh one, replays any setup expressions
+registered with
+[`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md),
+and resubmits the job, up to `retries` times. Because failed jobs are
+resubmitted, execution follows at-least-once semantics: job functions
+with side effects should be idempotent. The cluster is created when the
+backend is constructed and must be released with
+[`parallel_stop()`](https://rolfsimoes.github.io/siphon/reference/parallel_stop.md):
+
+``` r
+
+bk <- parallel_backend(2, retries = 3)
+parallel_setup_workers(bk, offset <- 100)
+
+res <- items |>
+  pump(function(x) x + offset, backend = bk) |>
+  pump_run(verbose = FALSE)
+
+print(res)
+#. [[1]]
+#. [1] 101
+#. 
+#. [[2]]
+#. [1] 102
+#. 
+#. [[3]]
+#. [1] 103
+#. 
+#. [[4]]
+#. [1] 104
+parallel_stop(bk)
+```
+
+See
+[`?parallel_backend`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+for the full fault-tolerance contract, including what is *not* handled
+(hung workers and failures of the main R process).
+
+### Pooling strategies: one shared pool or isolated pools
+
+Among the backends,
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+is the only one whose worker pool is an object you create and own
+(`mirai` daemons and `future` plans are process-global). The pool
+topology of a pipeline is therefore a design choice, with two patterns.
+
+**One shared pool.** Passing the same backend object to several stages
+shares its cluster between them — reusing one backend is by construction
+shared. The `max_workers` of the sharing stages statically partition the
+pool and must sum to at most the worker count; since each stage defaults
+to the full count, set it explicitly on every sharing stage. This is the
+economical choice when stages have complementary duty cycles: a pool of
+`n + 1` workers serving a heavy read stage (`max_workers = n`) and a
+near-idle write stage (`max_workers = 1`) avoids paying a whole extra
+cluster for a stage that is mostly waiting.
+
+Jobs in a shared pool have **no node affinity** — any free node can take
+a job from any sharing stage:
+
+``` r
+
+bk <- parallel_backend(2)
+
+res <- 1:6 |>
+  pump(function(x) {
+    Sys.sleep(0.02)
+    c(stage1_pid = Sys.getpid(), x = x)
+  }, backend = bk, max_workers = 1) |>
+  pump(function(v) {
+    Sys.sleep(0.02)
+    c(v, stage2_pid = Sys.getpid())
+  }, backend = bk, max_workers = 1) |>
+  pump_run(verbose = FALSE)
+
+stage1 <- unique(vapply(res, function(v) v[["stage1_pid"]], numeric(1)))
+stage2 <- unique(vapply(res, function(v) v[["stage2_pid"]], numeric(1)))
+
+# often non-empty: nodes are pooled, not bound to a stage
+intersect(stage1, stage2)
+#. [1] 7577
+parallel_stop(bk)
+```
+
+This has two practical consequences. Worker state registered with
+[`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
+must cover the needs of *every* sharing stage, because any node may run
+any stage’s jobs. And each node’s memory budget should accommodate the
+largest job of any sharing stage.
+
+**Isolated pools.** Creating a separate backend per stage isolates the
+pools: each stage’s jobs run only on its own cluster nodes,
+deterministically.
+
+``` r
+
+bk_read <- parallel_backend(1)
+bk_write <- parallel_backend(1)
+
+res <- 1:6 |>
+  pump(function(x) c(stage1_pid = Sys.getpid(), x = x),
+       backend = bk_read) |>
+  pump(function(v) c(v, stage2_pid = Sys.getpid()),
+       backend = bk_write) |>
+  pump_run(verbose = FALSE)
+
+stage1 <- unique(vapply(res, function(v) v[["stage1_pid"]], numeric(1)))
+stage2 <- unique(vapply(res, function(v) v[["stage2_pid"]], numeric(1)))
+
+# always empty: pools are disjoint by construction
+intersect(stage1, stage2)
+#. numeric(0)
+parallel_stop(bk_read)
+parallel_stop(bk_write)
+```
+
+Choose isolation when stages need different worker configurations:
+
+- different hosts — `parallel_backend(c("nodeA", "nodeB"))` for one
+  stage, local workers for another;
+- different fault-tolerance settings (`retries`, `retry_sleep`);
+- different worker state — heavy packages or large objects loaded only
+  into the pool that needs them;
+- separate per-node memory budgets — a node that just held a large
+  intermediate result never takes another stage’s job.
+
+The cost is more R processes and one more lifecycle to manage.
+
+|  | One shared pool | Isolated pools |
+|----|----|----|
+| Worker processes | one cluster | one cluster per stage |
+| Job placement | any free node, any stage | deterministic per stage |
+| Worker setup | union of all stages’ needs | tailored per stage |
+| Sizing rule | stage `max_workers` sum to at most the worker count | per-backend `max_workers` at most its own worker count |
+| Best when | complementary duty cycles (busy + near-idle stages) | heterogeneous hosts, state, or memory budgets |
 
 ## Backpressure and `buffer_size`
 
@@ -343,13 +484,13 @@ print(snapshot)
 #.     buffer:  0/20
 #.     done:    3
 #.     errors:  0
-#.     polls:   3 hits, 12 misses (20% hit)
-#.     time:    92.4ms (fn: 90.5ms, idle: 1.9ms)
+#.     polls:   3 hits, 11 misses (21.4% hit)
+#.     time:    92.8ms (fn: 90.5ms, idle: 2.3ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 3.7ms
+#.     poll_wall_time: 4.7ms
 #.     fn:             90.8ms
-#.     idle:           2.4ms
+#.     idle:           2.9ms
 
 mirai::daemons(0)
 ```
@@ -613,12 +754,12 @@ print(pump_status(f))
 #.     done:    5
 #.     errors:  0
 #.     polls:   5 hits, 6 misses (45.5% hit)
-#.     time:    1.8ms (fn: 0.1ms, idle: 1.7ms)
+#.     time:    2.8ms (fn: 0.1ms, idle: 2.7ms)
 #. 
 #.   Summary:
-#.     poll_wall_time: 3.3ms
-#.     fn:             50.9ms
-#.     idle:           2.3ms
+#.     poll_wall_time: 4.9ms
+#.     fn:             51.1ms
+#.     idle:           3.7ms
 
 mirai::daemons(0)
 ```
@@ -660,10 +801,10 @@ thread. This means:
 
 - **Only works with async/parallel backends:** The timeout will only
   trigger if control is returned to the main loop (e.g. using
-  [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md)
-  or
+  [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md),
   [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md)
-  with a parallel plan).
+  with a parallel plan, or
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)).
 - **Does not work for synchronous backends:** If using
   [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md)
   (or a sequential future plan), a job stuck in an infinite loop or
@@ -699,7 +840,7 @@ Use this table to pick options for a stage or a run:
 
 | Decision | Option | Guidance |
 |----|----|----|
-| Where to run a stage | `backend` | [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md) for sequential or main-thread-only work (e.g. GPU dispatch); [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md) or [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md) for parallel work. |
+| Where to run a stage | `backend` | [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md) for sequential or main-thread-only work (e.g. GPU dispatch); [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md), [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md), or [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md) for parallel work. |
 | How much concurrency | `max_workers` | Cap concurrent jobs per stage. Use `1` for resource-constrained stages; higher for CPU/I/O parallelism. Ignored (forced to `1`) for [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md). |
 | How much to buffer | `buffer_size` | Lower it to bound memory and enable backpressure when downstream is slow or items are large. Leave the default for small, fast pipelines. |
 | Collect vs. stream | [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md) vs [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md) | [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md) returns all results in input order. [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md) passes each item to a callback as it is ready - use it for infinite or long-running pipelines. |

@@ -251,6 +251,15 @@ using a constructor function (recommended) or a string alias:</p>
 <td><code>"future"</code></td>
 <td>Submits jobs through <code><a href="https://future.futureverse.org/reference/future.html" class="external-link">future::future()</a></code>.</td>
 </tr>
+<tr class="even">
+<td>Parallel</td>
+<td><code>parallel_backend(workers)</code></td>
+<td>—</td>
+<td>Owns a PSOCK cluster with fault tolerance to worker failures:
+crashed workers are replaced and their jobs resubmitted (see
+<code><a href="../reference/parallel_backend.html">?parallel_backend</a></code>). No string alias, since it requires a
+<code>workers</code> argument.</td>
+</tr>
 </tbody>
 </table>
 <p>Both styles are valid, and string aliases are automatically resolved
@@ -316,10 +325,10 @@ backend without repeating the backend specification for each stage:</p>
 <div class="section level3">
 <h3 id="worker-lifecycle-management">Worker lifecycle management<a class="anchor" aria-label="anchor" href="#worker-lifecycle-management"></a>
 </h3>
-<p>When using async backends like <code>mirai</code> or
-<code>future</code>, you are responsible for managing the worker
-lifecycle. Failing to shut down workers can leave zombie processes or
-open connections.</p>
+<p>When using async backends like <code>mirai</code>,
+<code>future</code>, or <code>parallel</code>, you are responsible for
+managing the worker lifecycle. Failing to shut down workers can leave
+zombie processes or open connections.</p>
 <div class="section level4">
 <h4 id="mirai">Mirai<a class="anchor" aria-label="anchor" href="#mirai"></a>
 </h4>
@@ -353,6 +362,164 @@ cleanup:</p>
 <span><span class="op">}</span></span></code></pre></div>
 </div>
 </div>
+<div class="section level3">
+<h3 id="fault-tolerant-execution-with-parallel_backend">Fault-tolerant execution with <code>parallel_backend()</code><a class="anchor" aria-label="anchor" href="#fault-tolerant-execution-with-parallel_backend"></a>
+</h3>
+<p>Unlike the other backends, <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> owns its
+PSOCK cluster. If a worker process dies mid-job, the backend replaces
+the node with a fresh one, replays any setup expressions registered with
+<code><a href="../reference/parallel_setup_workers.html">parallel_setup_workers()</a></code>, and resubmits the job, up to
+<code>retries</code> times. Because failed jobs are resubmitted,
+execution follows at-least-once semantics: job functions with side
+effects should be idempotent. The cluster is created when the backend is
+constructed and must be released with <code><a href="../reference/parallel_stop.html">parallel_stop()</a></code>:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">bk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/parallel_backend.html">parallel_backend</a></span><span class="op">(</span><span class="fl">2</span>, retries <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/parallel_setup_workers.html">parallel_setup_workers</a></span><span class="op">(</span><span class="va">bk</span>, <span class="va">offset</span> <span class="op">&lt;-</span> <span class="fl">100</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="va">offset</span>, backend <span class="op">=</span> <span class="va">bk</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">res</span><span class="op">)</span></span>
+<span><span class="co">#. [[1]]</span></span>
+<span><span class="co">#. [1] 101</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[2]]</span></span>
+<span><span class="co">#. [1] 102</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[3]]</span></span>
+<span><span class="co">#. [1] 103</span></span>
+<span><span class="co">#. </span></span>
+<span><span class="co">#. [[4]]</span></span>
+<span><span class="co">#. [1] 104</span></span>
+<span><span class="fu"><a href="../reference/parallel_stop.html">parallel_stop</a></span><span class="op">(</span><span class="va">bk</span><span class="op">)</span></span></code></pre></div>
+<p>See <code><a href="../reference/parallel_backend.html">?parallel_backend</a></code> for the full fault-tolerance
+contract, including what is <em>not</em> handled (hung workers and
+failures of the main R process).</p>
+</div>
+<div class="section level3">
+<h3 id="pooling-strategies-one-shared-pool-or-isolated-pools">Pooling strategies: one shared pool or isolated pools<a class="anchor" aria-label="anchor" href="#pooling-strategies-one-shared-pool-or-isolated-pools"></a>
+</h3>
+<p>Among the backends, <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> is the only one
+whose worker pool is an object you create and own (<code>mirai</code>
+daemons and <code>future</code> plans are process-global). The pool
+topology of a pipeline is therefore a design choice, with two
+patterns.</p>
+<p><strong>One shared pool.</strong> Passing the same backend object to
+several stages shares its cluster between them — reusing one backend is
+by construction shared. The <code>max_workers</code> of the sharing
+stages statically partition the pool and must sum to at most the worker
+count; since each stage defaults to the full count, set it explicitly on
+every sharing stage. This is the economical choice when stages have
+complementary duty cycles: a pool of <code>n + 1</code> workers serving
+a heavy read stage (<code>max_workers = n</code>) and a near-idle write
+stage (<code>max_workers = 1</code>) avoids paying a whole extra cluster
+for a stage that is mostly waiting.</p>
+<p>Jobs in a shared pool have <strong>no node affinity</strong> — any
+free node can take a job from any sharing stage:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">bk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/parallel_backend.html">parallel_backend</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/Sys.sleep.html" class="external-link">Sys.sleep</a></span><span class="op">(</span><span class="fl">0.02</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>stage1_pid <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getpid.html" class="external-link">Sys.getpid</a></span><span class="op">(</span><span class="op">)</span>, x <span class="op">=</span> <span class="va">x</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>, backend <span class="op">=</span> <span class="va">bk</span>, max_workers <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/Sys.sleep.html" class="external-link">Sys.sleep</a></span><span class="op">(</span><span class="fl">0.02</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">v</span>, stage2_pid <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getpid.html" class="external-link">Sys.getpid</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>, backend <span class="op">=</span> <span class="va">bk</span>, max_workers <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">stage1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">res</span>, <span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="va">v</span><span class="op">[[</span><span class="st">"stage1_pid"</span><span class="op">]</span><span class="op">]</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">stage2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">res</span>, <span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="va">v</span><span class="op">[[</span><span class="st">"stage2_pid"</span><span class="op">]</span><span class="op">]</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># often non-empty: nodes are pooled, not bound to a stage</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">intersect</a></span><span class="op">(</span><span class="va">stage1</span>, <span class="va">stage2</span><span class="op">)</span></span>
+<span><span class="co">#. [1] 7577</span></span>
+<span><span class="fu"><a href="../reference/parallel_stop.html">parallel_stop</a></span><span class="op">(</span><span class="va">bk</span><span class="op">)</span></span></code></pre></div>
+<p>This has two practical consequences. Worker state registered with
+<code><a href="../reference/parallel_setup_workers.html">parallel_setup_workers()</a></code> must cover the needs of
+<em>every</em> sharing stage, because any node may run any stage’s jobs.
+And each node’s memory budget should accommodate the largest job of any
+sharing stage.</p>
+<p><strong>Isolated pools.</strong> Creating a separate backend per
+stage isolates the pools: each stage’s jobs run only on its own cluster
+nodes, deterministically.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">bk_read</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/parallel_backend.html">parallel_backend</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">bk_write</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/parallel_backend.html">parallel_backend</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>stage1_pid <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getpid.html" class="external-link">Sys.getpid</a></span><span class="op">(</span><span class="op">)</span>, x <span class="op">=</span> <span class="va">x</span><span class="op">)</span>,</span>
+<span>       backend <span class="op">=</span> <span class="va">bk_read</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">v</span>, stage2_pid <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getpid.html" class="external-link">Sys.getpid</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>       backend <span class="op">=</span> <span class="va">bk_write</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">stage1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">res</span>, <span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="va">v</span><span class="op">[[</span><span class="st">"stage1_pid"</span><span class="op">]</span><span class="op">]</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">stage2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">res</span>, <span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="va">v</span><span class="op">[[</span><span class="st">"stage2_pid"</span><span class="op">]</span><span class="op">]</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># always empty: pools are disjoint by construction</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">intersect</a></span><span class="op">(</span><span class="va">stage1</span>, <span class="va">stage2</span><span class="op">)</span></span>
+<span><span class="co">#. numeric(0)</span></span>
+<span><span class="fu"><a href="../reference/parallel_stop.html">parallel_stop</a></span><span class="op">(</span><span class="va">bk_read</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/parallel_stop.html">parallel_stop</a></span><span class="op">(</span><span class="va">bk_write</span><span class="op">)</span></span></code></pre></div>
+<p>Choose isolation when stages need different worker
+configurations:</p>
+<ul>
+<li>different hosts — <code>parallel_backend(c("nodeA", "nodeB"))</code>
+for one stage, local workers for another;</li>
+<li>different fault-tolerance settings (<code>retries</code>,
+<code>retry_sleep</code>);</li>
+<li>different worker state — heavy packages or large objects loaded only
+into the pool that needs them;</li>
+<li>separate per-node memory budgets — a node that just held a large
+intermediate result never takes another stage’s job.</li>
+</ul>
+<p>The cost is more R processes and one more lifecycle to manage.</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th></th>
+<th>One shared pool</th>
+<th>Isolated pools</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Worker processes</td>
+<td>one cluster</td>
+<td>one cluster per stage</td>
+</tr>
+<tr class="even">
+<td>Job placement</td>
+<td>any free node, any stage</td>
+<td>deterministic per stage</td>
+</tr>
+<tr class="odd">
+<td>Worker setup</td>
+<td>union of all stages’ needs</td>
+<td>tailored per stage</td>
+</tr>
+<tr class="even">
+<td>Sizing rule</td>
+<td>stage <code>max_workers</code> sum to at most the worker count</td>
+<td>per-backend <code>max_workers</code> at most its own worker
+count</td>
+</tr>
+<tr class="odd">
+<td>Best when</td>
+<td>complementary duty cycles (busy + near-idle stages)</td>
+<td>heterogeneous hosts, state, or memory budgets</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 <div class="section level2">
 <h2 id="backpressure-and-buffer_size">Backpressure and <code>buffer_size</code><a class="anchor" aria-label="anchor" href="#backpressure-and-buffer_size"></a>
@@ -375,7 +542,7 @@ upstream, propagating the pressure backward through the pipeline.</p>
 <code><a href="../reference/pump_drain.html">pump_drain()</a></code> (covered in the next section) to stream items
 and capture a snapshot mid-run, the moment the third item reaches the
 sink:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span> <span class="op">|&gt;</span></span>
@@ -406,13 +573,13 @@ sink:</p>
 <span><span class="co">#.     buffer:  0/20</span></span>
 <span><span class="co">#.     done:    3</span></span>
 <span><span class="co">#.     errors:  0</span></span>
-<span><span class="co">#.     polls:   3 hits, 12 misses (20% hit)</span></span>
-<span><span class="co">#.     time:    92.4ms (fn: 90.5ms, idle: 1.9ms)</span></span>
+<span><span class="co">#.     polls:   3 hits, 11 misses (21.4% hit)</span></span>
+<span><span class="co">#.     time:    92.8ms (fn: 90.5ms, idle: 2.3ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
-<span><span class="co">#.     poll_wall_time: 3.7ms</span></span>
+<span><span class="co">#.     poll_wall_time: 4.7ms</span></span>
 <span><span class="co">#.     fn:             90.8ms</span></span>
-<span><span class="co">#.     idle:           2.4ms</span></span>
+<span><span class="co">#.     idle:           2.9ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>The source holds 20 items and Stage 1 could process them almost
@@ -438,7 +605,7 @@ backpressure.</p>
 provides a memory-safe alternative to <code><a href="../reference/pump_run.html">pump_run()</a></code>. Instead
 of accumulating results in a list, it passes each item to a callback
 function as soon as it is ready:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">5</span> <span class="op">|&gt;</span> <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/pump_drain.html">pump_drain</a></span><span class="op">(</span><span class="va">f</span>, handle_fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span>, <span class="va">data</span>, <span class="va">ok</span><span class="op">)</span> <span class="op">{</span></span>
@@ -491,7 +658,7 @@ the final result list.</li>
 <code>pump_run(..., on_error = ...)</code>. An explicit stage-level
 <code>on_error</code> always overrides the pipeline-wide default.</p>
 <p>Here is a fragile function that throws an error on odd numbers:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fragile_fn</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="va">x</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">2</span> <span class="op">!=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"odd number error"</span><span class="op">)</span></span>
@@ -503,7 +670,7 @@ the final result list.</li>
 </h3>
 <p>If no stage sets <code>on_error</code>, the pipeline stops on the
 first error:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -515,7 +682,7 @@ first error:</p>
 </h3>
 <p>With <code>"collect"</code>, the error objects themselves are
 preserved and returned in the result list:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_collect</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span>, on_error <span class="op">=</span> <span class="st">"collect"</span><span class="op">)</span></span>
@@ -540,7 +707,7 @@ preserved and returned in the result list:</p>
 <p>With <code>"continue"</code>, failed items are dropped entirely; the
 result list is shorter than the input but preserves the relative order
 of successful items:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_continue</span> <span class="op">&lt;-</span> <span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump_run.html">pump_run</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">FALSE</span>, on_error <span class="op">=</span> <span class="st">"continue"</span><span class="op">)</span></span>
@@ -559,7 +726,7 @@ of successful items:</p>
 <p>A stage can override the pipeline-wide default. In this example, the
 pipeline default is <code>"stop"</code>, but Stage 1 explicitly collects
 the error so Stage 2 can process it:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">items</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="va">fragile_fn</span>, backend <span class="op">=</span> <span class="st">"main"</span>, on_error <span class="op">=</span> <span class="st">"collect"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="fl">10</span>, backend <span class="op">=</span> <span class="st">"main"</span>, on_error <span class="op">=</span> <span class="st">"stop"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -622,7 +789,7 @@ across all stages.</li>
 </h3>
 <p>Call <code><a href="../reference/pump_status.html">pump_status()</a></code> after a run to see how the pipeline
 behaved:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">5</span> <span class="op">|&gt;</span></span>
@@ -674,12 +841,12 @@ behaved:</p>
 <span><span class="co">#.     done:    5</span></span>
 <span><span class="co">#.     errors:  0</span></span>
 <span><span class="co">#.     polls:   5 hits, 6 misses (45.5% hit)</span></span>
-<span><span class="co">#.     time:    1.8ms (fn: 0.1ms, idle: 1.7ms)</span></span>
+<span><span class="co">#.     time:    2.8ms (fn: 0.1ms, idle: 2.7ms)</span></span>
 <span><span class="co">#. </span></span>
 <span><span class="co">#.   Summary:</span></span>
-<span><span class="co">#.     poll_wall_time: 3.3ms</span></span>
-<span><span class="co">#.     fn:             50.9ms</span></span>
-<span><span class="co">#.     idle:           2.3ms</span></span>
+<span><span class="co">#.     poll_wall_time: 4.9ms</span></span>
+<span><span class="co">#.     fn:             51.1ms</span></span>
+<span><span class="co">#.     idle:           3.7ms</span></span>
 <span></span>
 <span><span class="fu">mirai</span><span class="fu">::</span><span class="fu"><a href="https://mirai.r-lib.org/reference/daemons.html" class="external-link">daemons</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></code></pre></div>
 <p>At a glance, the report confirms every item was pulled
@@ -717,8 +884,8 @@ This means:</p>
 <li>
 <strong>Only works with async/parallel backends:</strong> The
 timeout will only trigger if control is returned to the main loop
-(e.g. using <code><a href="../reference/mirai_backend.html">mirai_backend()</a></code> or
-<code><a href="../reference/future_backend.html">future_backend()</a></code> with a parallel plan).</li>
+(e.g. using <code><a href="../reference/mirai_backend.html">mirai_backend()</a></code>, <code><a href="../reference/future_backend.html">future_backend()</a></code>
+with a parallel plan, or <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code>).</li>
 <li>
 <strong>Does not work for synchronous backends:</strong> If using
 <code><a href="../reference/main_backend.html">main_backend()</a></code> (or a sequential future plan), a job stuck
@@ -769,8 +936,9 @@ using <code>liteq</code> for long-running daemon processes, see the <a href="dae
 <td><code>backend</code></td>
 <td>
 <code><a href="../reference/main_backend.html">main_backend()</a></code> for sequential or main-thread-only work
-(e.g. GPU dispatch); <code><a href="../reference/mirai_backend.html">mirai_backend()</a></code> or
-<code><a href="../reference/future_backend.html">future_backend()</a></code> for parallel work.</td>
+(e.g. GPU dispatch); <code><a href="../reference/mirai_backend.html">mirai_backend()</a></code>,
+<code><a href="../reference/future_backend.html">future_backend()</a></code>, or <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> for
+parallel work.</td>
 </tr>
 <tr class="even">
 <td>How much concurrency</td>
@@ -825,7 +993,7 @@ during a run.</td>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

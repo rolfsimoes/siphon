@@ -35,7 +35,9 @@ pump(
 
 - backend:
 
-  A backend object or one of `"main"`, `"mirai"`, or `"future"`. If
+  A backend object or one of `"main"`, `"mirai"`, or `"future"`. Use
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  directly for fault-tolerant PSOCK execution (no string alias). If
   `NULL` (the default), the stage inherits the backend set by
   [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
   or

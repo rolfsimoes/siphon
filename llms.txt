@@ -69,8 +69,12 @@ print(res)
 
 - **Pull-based staged pipelines** - Items move to downstream stages as
   soon as they are ready, without waiting for upstream completion
-- **Multiple execution backends** - Support for main thread, mirai, and
-  future backends
+- **Multiple execution backends** - Support for main thread, mirai,
+  future, and parallel (PSOCK) backends
+- **Fault-tolerant execution** -
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  replaces crashed workers and resubmits their jobs (at-least-once
+  semantics)
 - **Backpressure control** - Bounded buffers with `buffer_size` to limit
   memory usage
 - **Concurrency control** - Per-stage `max_workers` to manage resource
@@ -95,7 +99,11 @@ print(res)
 Use direct parallel map tools when the problem is simply `lapply(x, f)`
 with workers. Use `siphon` when the problem is a staged flow with
 different resource constraints per stage, such as CPU preparation,
-main-thread GPU dispatch, and parallel I/O.
+main-thread GPU dispatch, and parallel I/O. Note that stages using
+[`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md)
+run sequentially on the main thread but do not block pipeline
+coordination-other stages on async backends continue processing in
+parallel.
 
 See the
 [`vignette("siphon")`](https://rolfsimoes.github.io/siphon/articles/siphon.md)
@@ -112,6 +120,14 @@ examples.
   : Create a main-thread backend
 - [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md)
   : Create a mirai backend
+- [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  : Create a parallel (PSOCK) backend
+- [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md)
+  : Evaluate an expression on all workers of a parallel backend
+- [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
+  : Run setup code on all workers of a parallel backend
+- [`parallel_stop()`](https://rolfsimoes.github.io/siphon/reference/parallel_stop.md)
+  : Stop a parallel backend
 - [`print(`*`<pump>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump.md)
   : Print a pump pipeline
 - [`print(`*`<pump_future_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_future_backend.md)
@@ -120,6 +136,8 @@ examples.
   : Print a main backend
 - [`print(`*`<pump_mirai_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_mirai_backend.md)
   : Print a mirai backend
+- [`print(`*`<pump_parallel_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_parallel_backend.md)
+  : Print a parallel backend
 - [`pump()`](https://rolfsimoes.github.io/siphon/reference/pump.md) :
   Add a processing stage to a pipeline
 - [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)

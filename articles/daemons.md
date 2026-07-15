@@ -174,9 +174,10 @@ run_mirai_daemon <- function(db_path,
 
 The `n_ready()` guard added to `pull_fn()` above is essential when
 combining `liteq` with a parallel backend
-([`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md)
+([`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md),
+[`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md),
 or
-[`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md)).
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)).
 
 [`liteq::try_consume()`](https://rdrr.io/pkg/liteq/man/try_consume.html)
 runs a crash-recovery sweep whenever it is called and **no `READY`
@@ -212,6 +213,40 @@ pull_fn <- function() {
 > this guard: it counts *all* messages, including `WORKING` ones, so it
 > stays `FALSE` while jobs are in flight. Use it only for `done_fn` (the
 > daemon is finished when no messages remain at all).
+
+## Fault-tolerant execution with `parallel_backend()`
+
+For a long-lived daemon, a crashed worker process should not take the
+whole daemon down.
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+provides this out of the box: it owns a PSOCK cluster, and when a worker
+dies it replaces the node, replays setup expressions registered with
+[`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md),
+and resubmits the in-flight job up to `retries` times. This fits the
+queue architecture naturally - `liteq` already gives at-least-once
+delivery via `ack`/`nack`, and the backend’s retry semantics are also
+at-least-once, so task handlers should be idempotent either way.
+
+To use it, swap the backend inside the daemon function:
+
+``` r
+
+bk <- parallel_backend(n_workers, retries = 3)
+parallel_setup_workers(bk, library(jsonlite))
+on.exit(parallel_stop(bk), add = TRUE)
+
+pipeline <- make_liteq_source(q) |>
+    pump(
+      function(payload) payload$x * 10,
+      backend = bk,
+      max_workers = n_workers,
+      buffer_size = n_workers
+    )
+```
+
+See
+[`?parallel_backend`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+for the full fault-tolerance contract.
 
 ## Publishing messages to the daemon
 
@@ -322,5 +357,5 @@ This architecture keeps the web tier responsive while background workers
 handle long-running tasks. It bounds resources through controlled
 concurrency and backpressure, provides reliability via commit/abort
 semantics on a persistent queue, and scales independently by tuning
-workers—regardless of which queue or parallel backend you use. These
+workers-regardless of which queue or parallel backend you use. These
 properties realize the separation of concerns introduced at the start.

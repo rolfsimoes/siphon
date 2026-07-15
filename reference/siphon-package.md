@@ -2,8 +2,9 @@
 
 siphon provides a pull-based pipeline runtime where items flow through a
 chain of stages. Each stage pulls work from its upstream source when it
-has free slots, submits jobs to a backend (main, mirai, future), and
-yields completed items downstream. Results are collected by
+has free slots, submits jobs to a backend (main, mirai, future,
+parallel), and yields completed items downstream. Results are collected
+by
 [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
 in the original input order via sequential internal indices (idx).
 
@@ -26,6 +27,11 @@ backend-specific execution.
 - [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md):
 
   Submits jobs through future::future() for async execution
+
+- [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md):
+
+  Owns a PSOCK cluster with fault tolerance to worker failures; use
+  parallel_setup_workers() and parallel_stop()
 
 ## Error Handling
 

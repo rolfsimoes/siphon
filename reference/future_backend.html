@@ -59,6 +59,12 @@ available slots is read from <code><a href="https://future.futureverse.org/refer
     <p>Note: When using future_backend(), you are responsible for managing
 the future plan lifecycle. Call <code><a href="https://future.futureverse.org/reference/plan.html" class="external-link">future::plan()</a></code> to set a plan and restore
 the previous plan when done. See the vignette for examples.</p>
+<p>Fault tolerance is delegated to the <code>future</code> framework: this backend
+performs no retries. If a worker dies while running a job, the
+resulting <code>FutureError</code> is surfaced as a <code>pump_error</code> value for that
+item (subject to the <code>on_error</code> policy) rather than aborting the
+pipeline. For siphon-managed recovery with retries, see
+<code><a href="parallel_backend.html">parallel_backend()</a></code>.</p>
     </div>
 
     <div class="section level2">
@@ -96,7 +102,7 @@ the previous plan when done. See the vignette for examples.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

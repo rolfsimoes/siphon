@@ -1,5 +1,40 @@
 # Changelog
 
+## siphon (development version)
+
+- Added
+  [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md),
+  an equivalent of
+  [`parallel::clusterEvalQ()`](https://rdrr.io/r/parallel/clusterApply.html)
+  for parallel backends: evaluates an expression in the global
+  environment of every worker and returns the per-worker results.
+  Supports injecting values from the calling frame with `{{ }}`, like
+  [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md).
+  Unlike setup expressions, evaluations are not recorded for replay on
+  replacement nodes.
+- Corrected
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  documentation: one backend **can** be shared across multiple
+  [`pump()`](https://rolfsimoes.github.io/siphon/reference/pump.md)
+  stages — results are received per node and cannot cross-wire. The
+  requirement is that the `max_workers` of the sharing stages sum to at
+  most the worker count (each stage defaults to the full count, so set
+  it explicitly). Documented with an example and covered by tests,
+  including the failure mode when the pool is oversubscribed.
+- New vignette section “Pooling strategies: one shared pool or isolated
+  pools” documenting when to share one
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  across stages versus creating a separate backend per stage to isolate
+  worker pools (job placement, worker state, and sizing trade-offs).
+- Worker setup and evaluation are now broadcast: expressions are
+  dispatched to all nodes before results are collected, so
+  [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
+  and
+  [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md)
+  complete in the time of the slowest worker instead of the sum of all
+  workers. Per-node ordering of setup expressions is preserved, and
+  replay on replacement nodes is unchanged.
+
 ## siphon 0.4.2
 
 ### Package Renaming & API Standardization
@@ -47,6 +82,7 @@
   [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
   to avoid infinite polling on stuck R jobs.
 - Added [`requireNamespace()`](https://rdrr.io/r/base/ns-load.html)
-  checks for `mirai` and `future` backends with clear error messages.
-- Added async-backend scheduling tests for `mirai` and `future`
-  backends.
+  checks for `mirai`, `future`, and `parallel` backends with clear error
+  messages.
+- Added async-backend scheduling tests for `mirai`, `future`, and
+  `parallel` backends.

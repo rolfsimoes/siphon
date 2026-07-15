@@ -35,7 +35,10 @@ pump_drain(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main")
 
   Default backend for all stages that do not explicitly set their own
   `backend`. Can be a backend object or one of `"main"`, `"mirai"`, or
-  `"future"`. Defaults to `"main"`.
+  `"future"`. Use
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  directly for fault-tolerant PSOCK execution (no string alias).
+  Defaults to `"main"`.
 
 ## Value
 

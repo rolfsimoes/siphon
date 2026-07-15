@@ -11,10 +11,15 @@
 <url><loc>https://rolfsimoes.github.io/siphon/reference/index.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/main_backend.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/mirai_backend.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/parallel_backend.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/parallel_stop.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_future_backend.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_main_backend.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_mirai_backend.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_parallel_backend.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_drain.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_item_registry.html</loc></url>

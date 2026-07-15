@@ -20,6 +20,13 @@ Note: When using mirai_backend(), you are responsible for managing the
 mirai daemon lifecycle. Call `mirai::daemons(n)` to start workers and
 `mirai::daemons(0)` to shut them down. See the vignette for examples.
 
+Fault tolerance is delegated to the `mirai` framework: this backend
+performs no retries. If a daemon dies while running a job, the resulting
+`errorValue` is surfaced as a `pump_error` value for that item (subject
+to the `on_error` policy) rather than leaking into the pipeline. For
+siphon-managed recovery with retries, see
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md).
+
 ## Examples
 
 ``` r

@@ -235,8 +235,8 @@ workers down cleanly. For programmatic shutdown, publish a sentinel
 </h2>
 <p>The <code>n_ready()</code> guard added to <code>pull_fn()</code>
 above is essential when combining <code>liteq</code> with a parallel
-backend (<code><a href="../reference/mirai_backend.html">mirai_backend()</a></code> or
-<code><a href="../reference/future_backend.html">future_backend()</a></code>).</p>
+backend (<code><a href="../reference/mirai_backend.html">mirai_backend()</a></code>, <code><a href="../reference/future_backend.html">future_backend()</a></code>, or
+<code><a href="../reference/parallel_backend.html">parallel_backend()</a></code>).</p>
 <p><code><a href="https://rdrr.io/pkg/liteq/man/try_consume.html" class="external-link">liteq::try_consume()</a></code> runs a crash-recovery sweep
 whenever it is called and <strong>no <code>READY</code> message is
 available</strong>. That sweep probes the lock file of every in-flight
@@ -268,13 +268,42 @@ all).</p>
 </blockquote>
 </div>
 <div class="section level2">
+<h2 id="fault-tolerant-execution-with-parallel_backend">Fault-tolerant execution with <code>parallel_backend()</code><a class="anchor" aria-label="anchor" href="#fault-tolerant-execution-with-parallel_backend"></a>
+</h2>
+<p>For a long-lived daemon, a crashed worker process should not take the
+whole daemon down. <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> provides this out of
+the box: it owns a PSOCK cluster, and when a worker dies it replaces the
+node, replays setup expressions registered with
+<code><a href="../reference/parallel_setup_workers.html">parallel_setup_workers()</a></code>, and resubmits the in-flight job
+up to <code>retries</code> times. This fits the queue architecture
+naturally - <code>liteq</code> already gives at-least-once delivery via
+<code>ack</code>/<code>nack</code>, and the backend’s retry semantics
+are also at-least-once, so task handlers should be idempotent either
+way.</p>
+<p>To use it, swap the backend inside the daemon function:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">bk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/parallel_backend.html">parallel_backend</a></span><span class="op">(</span><span class="va">n_workers</span>, retries <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/parallel_setup_workers.html">parallel_setup_workers</a></span><span class="op">(</span><span class="va">bk</span>, <span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://jeroen.r-universe.dev/jsonlite" class="external-link">jsonlite</a></span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/on.exit.html" class="external-link">on.exit</a></span><span class="op">(</span><span class="fu"><a href="../reference/parallel_stop.html">parallel_stop</a></span><span class="op">(</span><span class="va">bk</span><span class="op">)</span>, add <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">pipeline</span> <span class="op">&lt;-</span> <span class="fu">make_liteq_source</span><span class="op">(</span><span class="va">q</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>    <span class="fu"><a href="../reference/pump.html">pump</a></span><span class="op">(</span></span>
+<span>      <span class="kw">function</span><span class="op">(</span><span class="va">payload</span><span class="op">)</span> <span class="va">payload</span><span class="op">$</span><span class="va">x</span> <span class="op">*</span> <span class="fl">10</span>,</span>
+<span>      backend <span class="op">=</span> <span class="va">bk</span>,</span>
+<span>      max_workers <span class="op">=</span> <span class="va">n_workers</span>,</span>
+<span>      buffer_size <span class="op">=</span> <span class="va">n_workers</span></span>
+<span>    <span class="op">)</span></span></code></pre></div>
+<p>See <code><a href="../reference/parallel_backend.html">?parallel_backend</a></code> for the full fault-tolerance
+contract.</p>
+</div>
+<div class="section level2">
 <h2 id="publishing-messages-to-the-daemon">Publishing messages to the daemon<a class="anchor" aria-label="anchor" href="#publishing-messages-to-the-daemon"></a>
 </h2>
 <p>To send work to the daemon, publish messages to the queue from your
 web application or any other R process. Use
 <code><a href="https://rdrr.io/pkg/liteq/man/publish.html" class="external-link">liteq::publish()</a></code> with both <code>title</code> (a
 descriptive label) and <code>message</code> (the JSON payload):</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/r-lib/liteq#readme" class="external-link">liteq</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://jeroen.r-universe.dev/jsonlite" class="external-link">jsonlite</a></span><span class="op">)</span></span>
 <span></span>
@@ -312,7 +341,7 @@ call <code>save_result()</code> with the transformed data. The
 <code><a href="../reference/pump_item_registry.html">pump_item_registry()</a></code>, which stores source-owned objects by
 item ID. This is the same approach that
 <code><a href="../reference/pump_managed_source.html">pump_managed_source()</a></code> uses internally:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">make_liteq_source</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">queue</span>, <span class="va">run_forever</span> <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="va">registry</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pump_item_registry.html">pump_item_registry</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
@@ -369,7 +398,7 @@ item ID. This is the same approach that
 workers handle long-running tasks. It bounds resources through
 controlled concurrency and backpressure, provides reliability via
 commit/abort semantics on a persistent queue, and scales independently
-by tuning workers—regardless of which queue or parallel backend you use.
+by tuning workers-regardless of which queue or parallel backend you use.
 These properties realize the separation of concerns introduced at the
 start.</p>
 </div>
@@ -384,7 +413,7 @@ start.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>
