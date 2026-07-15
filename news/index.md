@@ -6,36 +6,23 @@
 
 - Added
   [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md),
-  an equivalent of
+  equivalent to
   [`parallel::clusterEvalQ()`](https://rdrr.io/r/parallel/clusterApply.html)
-  for parallel backends: evaluates an expression in the global
-  environment of every worker and returns the per-worker results.
-  Supports injecting values from the calling frame with `{{ }}`, like
-  [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md).
-  Unlike setup expressions, evaluations are not recorded for replay on
-  replacement nodes.
+  for parallel backends. Evaluates expressions in worker global
+  environments with `{{ }}` injection support. Not recorded for replay
+  on replacement nodes.
 - Corrected
   [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
-  documentation: one backend **can** be shared across multiple
-  [`pump()`](https://rolfsimoes.github.io/siphon/reference/pump.md)
-  stages — results are received per node and cannot cross-wire. The
-  requirement is that the `max_workers` of the sharing stages sum to at
-  most the worker count (each stage defaults to the full count, so set
-  it explicitly). Documented with an example and covered by tests,
-  including the failure mode when the pool is oversubscribed.
-- New vignette section “Pooling strategies: one shared pool or isolated
-  pools” documenting when to share one
+  documentation: backends can be shared across stages. Sharing stages’
+  `max_workers` must sum to at most the worker count. Documented with
+  examples and tests including oversubscription failure mode.
+- Added vignette section on pooling strategies: sharing one
   [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
-  across stages versus creating a separate backend per stage to isolate
-  worker pools (job placement, worker state, and sizing trade-offs).
-- Worker setup and evaluation are now broadcast: expressions are
-  dispatched to all nodes before results are collected, so
-  [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
-  and
-  [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md)
-  complete in the time of the slowest worker instead of the sum of all
-  workers. Per-node ordering of setup expressions is preserved, and
-  replay on replacement nodes is unchanged.
+  across stages versus isolated pools per stage.
+- Worker setup and evaluation now broadcast to all nodes before
+  collecting results, completing in the time of the slowest worker
+  instead of summing all workers. Preserves per-node ordering and replay
+  behavior.
 
 ## siphon 0.4.2
 
