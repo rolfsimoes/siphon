@@ -1,5 +1,7 @@
 # siphon (development version)
 
+# siphon 0.5.0
+
 - Added `parallel_eval_workers()`, an equivalent of
   `parallel::clusterEvalQ()` for parallel backends: evaluates an expression
   in the global environment of every worker and returns the per-worker
