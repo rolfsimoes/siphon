@@ -3,7 +3,7 @@
 ## Summary
 
 A siphon pipeline using a `liteq`-backed `pump_managed_source()` with a
-**parallel backend** (`mirai_backend()` / `future_backend()`) appears to hang.
+**parallel backend** (`mirai_backend()` / `future_backend()` / `parallel_backend()`) appears to hang.
 The stall is **not** in siphon. It is caused by `liteq::try_consume()`'s
 crash-recovery path, which blocks on the SQLite busy timeout (~10s) for **each
 in-flight (`WORKING`) message** whenever it is called while no `READY` message
