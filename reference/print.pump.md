@@ -30,6 +30,10 @@ print(x, ...)
 
   Unused.
 
+## Value
+
+The input `x`, invisibly.
+
 ## Legend
 
 Compressed labels used in the output:

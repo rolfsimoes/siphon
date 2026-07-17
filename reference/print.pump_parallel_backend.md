@@ -18,3 +18,7 @@ print(x, ...)
 - ...:
 
   Unused.
+
+## Value
+
+The input `x`, invisibly.
