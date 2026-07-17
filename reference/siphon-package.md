@@ -6,7 +6,7 @@ has free slots, submits jobs to a backend (main, mirai, future,
 parallel), and yields completed items downstream. Results are collected
 by
 [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
-in the original input order via sequential internal indices (idx).
+in the original input order via sequential internal indices (`idx`).
 
 ## Details
 

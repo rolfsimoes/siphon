@@ -373,7 +373,7 @@ stage2 <- unique(vapply(res, function(v) v[["stage2_pid"]], numeric(1)))
 
 # often non-empty: nodes are pooled, not bound to a stage
 intersect(stage1, stage2)
-#. [1] 7576
+#. [1] 7513
 parallel_stop(bk)
 ```
 
@@ -473,10 +473,10 @@ print(snapshot)
 #. ┌─ source   7/20
 #. ├─ stage 1 mirai
 #. │    wrk [#####] 2/2   buf [##---] 1/2    done 5   err 0
-#. │    fn 0.1ms/it   crd 0.2ms/bt   wrk 20% stv 0% blk 80%
+#. │    fn 0.1ms/it   crd 0.6ms/bt   wrk 20% stv 0% blk 80%
 #. ├─ stage 2 mirai  * bottleneck
 #. │    wrk [#####] 1/1   buf [-----] 0/20   done 3   err 0
-#. │    fn 30.1ms/it   crd 0.1ms/bt   wrk 93% stv 7% blk 0%
+#. │    fn 30.2ms/it   crd 0.2ms/bt   wrk 93% stv 7% blk 0%
 #. └─ sink   3/20
 
 mirai::daemons(0)
@@ -725,14 +725,14 @@ pump_run(f, verbose = FALSE)
 
 # Source position, per-stage completed/errors, and a fn-vs-idle timing summary
 print(pump_status(f))
-#. <pump_status (20)>
+#. <pump_status (22)>
 #. ┌─ source   5/5
-#. ├─ stage 1 mirai
+#. ├─ stage 1 mirai  * bottleneck
 #. │    wrk [-----] 0/2   buf [-----] 0/5   done 5   err 0
-#. │    fn 10.2ms/it   crd 0.2ms/bt   wrk 100% stv 0% blk 0%
+#. │    fn 10.2ms/it   crd 0.1ms/bt   wrk 100% stv 0% blk 0%
 #. ├─ stage 2 mirai
 #. │    wrk [-----] 0/2   buf [-----] 0/5   done 5   err 0
-#. │    fn 0.0ms/it   crd 0.2ms/bt   wrk 82% stv 18% blk 0%
+#. │    fn 0.0ms/it   crd 0.2ms/bt   wrk 64% stv 36% blk 0%
 #. └─ sink   5/5
 
 mirai::daemons(0)

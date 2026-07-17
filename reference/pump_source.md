@@ -47,19 +47,19 @@ pump_source(
 
   The total number of items to expect. Defaults to `Inf`. Used by
   [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
-  for result pre-allocation and progress reporting.
+  for result preallocation and progress reporting.
 
 - item_commit_fn:
 
   An optional function called when an item successfully completes the
   pipeline. Receives `id` and `data` arguments. Used for acknowledging
-  external resources (e.g., message queue ack).
+  external resources (e.g., message queue `ack`).
 
 - item_abort_fn:
 
   An optional function called when an item fails. Receives `id`,
   `error`, and `data` arguments. Used for rejecting external resources
-  (e.g., message queue nack).
+  (e.g., message queue `nack`).
 
 - item_release_fn:
 
