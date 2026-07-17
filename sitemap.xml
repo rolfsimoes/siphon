@@ -7,6 +7,8 @@
 <url><loc>https://rolfsimoes.github.io/siphon/authors.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/index.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/news/index.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/format.pump.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/format.pump_status.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/future_backend.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/index.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/main_backend.html</loc></url>
@@ -20,13 +22,17 @@
 <url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_main_backend.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_mirai_backend.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_parallel_backend.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/print.pump_status.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_drain.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_item_registry.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_managed_source.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/pump_peek.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/pump_pop.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_run.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_source.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/pump_status.html</loc></url>
+<url><loc>https://rolfsimoes.github.io/siphon/reference/pump_step.html</loc></url>
 <url><loc>https://rolfsimoes.github.io/siphon/reference/siphon-package.html</loc></url>
 </urlset>
 

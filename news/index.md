@@ -1,28 +1,73 @@
 # Changelog
 
-## siphon (development version)
+## siphon 0.6.0
+
+### Pipeline inspection
+
+- Added
+  [`pump_step()`](https://rolfsimoes.github.io/siphon/reference/pump_step.md)
+  for advancing work without consuming results.
+- Added
+  [`pump_peek()`](https://rolfsimoes.github.io/siphon/reference/pump_peek.md)
+  for viewing ready results without removing them.
+- Added
+  [`pump_pop()`](https://rolfsimoes.github.io/siphon/reference/pump_pop.md)
+  for explicitly consuming one result.
+- Redesigned [`print()`](https://rdrr.io/r/base/print.html) to display
+  pipelines as connected frames with worker/buffer occupancy bars,
+  timing metrics, beat-state shares, and bottleneck markers.
+- Added ANSI color support for terminal output (honors `NO_COLOR` and
+  `options(siphon.color =)`).
+- Added box-drawing glyphs with ASCII fallback via
+  `options(siphon.unicode = FALSE)`.
+- Added `delivered` field to
+  [`pump_status()`](https://rolfsimoes.github.io/siphon/reference/pump_status.md)
+  reporting items that left the pipeline.
+- Added `in_flight` and `buffered_ids` fields to
+  [`pump_status()`](https://rolfsimoes.github.io/siphon/reference/pump_status.md)
+  for per-stage tracking.
+
+### Timing model (breaking)
+
+- Redesigned stage timing metrics to accumulate only inside
+  `next_item()`/`pop_item()` calls.
+- Removed fields: `poll_hits`, `poll_misses`, `poll_wall_time`,
+  `idle_time`.
+- Added fields: `beats`,
+  `beats_working`/`beats_starved`/`beats_blocked`, `share_*` ratios,
+  `pop_hits`/`pop_misses`, `tick_time`, `submit_time`, `pull_time`,
+  `coord_time`, `fn_per_item`, `throughput`.
+- Beats on finished pipelines are no longer recorded; stats freeze when
+  source is exhausted.
+- [`pump_step()`](https://rolfsimoes.github.io/siphon/reference/pump_step.md)
+  stops early when further beats cannot change anything.
+- All durations now consistently in milliseconds (sources previously
+  used seconds).
+
+### Scheduling
+
+- Changed beat to drain-advance-drain; jobs completing during advance
+  land in buffer immediately.
+
+### Fixes
+
+- Added `%||%` compatibility shim for R \< 4.4.0.
+- Fixed
+  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  stages to report as `"parallel"` instead of `"unknown"`.
+- Refactored internal stage tick into single-responsibility helpers.
 
 ## siphon 0.5.0
 
 - Added
-  [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md),
-  equivalent to
-  [`parallel::clusterEvalQ()`](https://rdrr.io/r/parallel/clusterApply.html)
-  for parallel backends. Evaluates expressions in worker global
-  environments with `{{ }}` injection support. Not recorded for replay
-  on replacement nodes.
+  [`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md)
+  for evaluating expressions in worker global environments.
 - Corrected
   [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
-  documentation: backends can be shared across stages. Sharing stages’
-  `max_workers` must sum to at most the worker count. Documented with
-  examples and tests including oversubscription failure mode.
-- Added vignette section on pooling strategies: sharing one
-  [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
-  across stages versus isolated pools per stage.
-- Worker setup and evaluation now broadcast to all nodes before
-  collecting results, completing in the time of the slowest worker
-  instead of summing all workers. Preserves per-node ordering and replay
-  behavior.
+  documentation for shared backends across stages.
+- Added vignette section on pooling strategies.
+- Changed worker setup to broadcast to all nodes before collecting
+  results.
 
 ## siphon 0.4.2
 

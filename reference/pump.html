@@ -11,7 +11,7 @@ yields completed items to downstream stages."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -104,6 +104,15 @@ backend worker count. Ignored for the synchronous <code><a href="main_backend.ht
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A pump object.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Stages implement a two-phase protocol: <code>$next_item()</code> runs one <em>beat</em>
+(harvest completed jobs into the output buffer, then refill free slots by
+pulling upstream — safe to call repeatedly) and <code>$pop_item()</code> consumes one
+ready result. For interactive use prefer the exported verbs <code><a href="pump_step.html">pump_step()</a></code>,
+<code><a href="pump_peek.html">pump_peek()</a></code>, and <code><a href="pump_pop.html">pump_pop()</a></code>; inspect state with <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> or
+<code><a href="pump_status.html">pump_status()</a></code>.</p>
     </div>
 
     <div class="section level2">

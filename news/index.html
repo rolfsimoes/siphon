@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,14 +38,45 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="siphon-development-version">siphon (development version)<a class="anchor" aria-label="anchor" href="#siphon-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.6.0" id="siphon-060">siphon 0.6.0<a class="anchor" aria-label="anchor" href="#siphon-060"></a></h2>
+<div class="section level3">
+<h3 id="pipeline-inspection-0-6-0">Pipeline inspection<a class="anchor" aria-label="anchor" href="#pipeline-inspection-0-6-0"></a></h3>
+<ul><li>Added <code><a href="../reference/pump_step.html">pump_step()</a></code> for advancing work without consuming results.</li>
+<li>Added <code><a href="../reference/pump_peek.html">pump_peek()</a></code> for viewing ready results without removing them.</li>
+<li>Added <code><a href="../reference/pump_pop.html">pump_pop()</a></code> for explicitly consuming one result.</li>
+<li>Redesigned <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> to display pipelines as connected frames with worker/buffer occupancy bars, timing metrics, beat-state shares, and bottleneck markers.</li>
+<li>Added ANSI color support for terminal output (honors <code>NO_COLOR</code> and <code>options(siphon.color =)</code>).</li>
+<li>Added box-drawing glyphs with ASCII fallback via <code>options(siphon.unicode = FALSE)</code>.</li>
+<li>Added <code>delivered</code> field to <code><a href="../reference/pump_status.html">pump_status()</a></code> reporting items that left the pipeline.</li>
+<li>Added <code>in_flight</code> and <code>buffered_ids</code> fields to <code><a href="../reference/pump_status.html">pump_status()</a></code> for per-stage tracking.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="timing-model-breaking-0-6-0">Timing model (breaking)<a class="anchor" aria-label="anchor" href="#timing-model-breaking-0-6-0"></a></h3>
+<ul><li>Redesigned stage timing metrics to accumulate only inside <code>next_item()</code>/<code>pop_item()</code> calls.</li>
+<li>Removed fields: <code>poll_hits</code>, <code>poll_misses</code>, <code>poll_wall_time</code>, <code>idle_time</code>.</li>
+<li>Added fields: <code>beats</code>, <code>beats_working</code>/<code>beats_starved</code>/<code>beats_blocked</code>, <code>share_*</code> ratios, <code>pop_hits</code>/<code>pop_misses</code>, <code>tick_time</code>, <code>submit_time</code>, <code>pull_time</code>, <code>coord_time</code>, <code>fn_per_item</code>, <code>throughput</code>.</li>
+<li>Beats on finished pipelines are no longer recorded; stats freeze when source is exhausted.</li>
+<li>
+<code><a href="../reference/pump_step.html">pump_step()</a></code> stops early when further beats cannot change anything.</li>
+<li>All durations now consistently in milliseconds (sources previously used seconds).</li>
+</ul></div>
+<div class="section level3">
+<h3 id="scheduling-0-6-0">Scheduling<a class="anchor" aria-label="anchor" href="#scheduling-0-6-0"></a></h3>
+<ul><li>Changed beat to drain-advance-drain; jobs completing during advance land in buffer immediately.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="fixes-0-6-0">Fixes<a class="anchor" aria-label="anchor" href="#fixes-0-6-0"></a></h3>
+<ul><li>Added <code>%||%</code> compatibility shim for R &lt; 4.4.0.</li>
+<li>Fixed <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> stages to report as <code>"parallel"</code> instead of <code>"unknown"</code>.</li>
+<li>Refactored internal stage tick into single-responsibility helpers.</li>
+</ul></div>
 </div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.5.0" id="siphon-050">siphon 0.5.0<a class="anchor" aria-label="anchor" href="#siphon-050"></a></h2>
-<ul><li>Added <code><a href="../reference/parallel_eval_workers.html">parallel_eval_workers()</a></code>, equivalent to <code><a href="https://rdrr.io/r/parallel/clusterApply.html" class="external-link">parallel::clusterEvalQ()</a></code> for parallel backends. Evaluates expressions in worker global environments with <code>{{ }}</code> injection support. Not recorded for replay on replacement nodes.</li>
-<li>Corrected <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> documentation: backends can be shared across stages. Sharing stages’ <code>max_workers</code> must sum to at most the worker count. Documented with examples and tests including oversubscription failure mode.</li>
-<li>Added vignette section on pooling strategies: sharing one <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> across stages versus isolated pools per stage.</li>
-<li>Worker setup and evaluation now broadcast to all nodes before collecting results, completing in the time of the slowest worker instead of summing all workers. Preserves per-node ordering and replay behavior.</li>
+<ul><li>Added <code><a href="../reference/parallel_eval_workers.html">parallel_eval_workers()</a></code> for evaluating expressions in worker global environments.</li>
+<li>Corrected <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> documentation for shared backends across stages.</li>
+<li>Added vignette section on pooling strategies.</li>
+<li>Changed worker setup to broadcast to all nodes before collecting results.</li>
 </ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.4.2" id="siphon-042">siphon 0.4.2<a class="anchor" aria-label="anchor" href="#siphon-042"></a></h2>

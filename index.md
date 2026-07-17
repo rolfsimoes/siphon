@@ -84,6 +84,12 @@ print(res)
 - **Timeout protection** - Optional `timeout` in
   [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
   to avoid infinite polling
+- **Interactive inspection** -
+  [`pump_step()`](https://rolfsimoes.github.io/siphon/reference/pump_step.md),
+  [`pump_peek()`](https://rolfsimoes.github.io/siphon/reference/pump_peek.md),
+  [`pump_pop()`](https://rolfsimoes.github.io/siphon/reference/pump_pop.md),
+  and a rich [`print()`](https://rdrr.io/r/base/print.html) to step
+  through and debug a live pipeline
 - **Status inspection** -
   [`pump_status()`](https://rolfsimoes.github.io/siphon/reference/pump_status.md)
   for monitoring pipeline state
@@ -104,6 +110,114 @@ main-thread GPU dispatch, and parallel I/O. Note that stages using
 run sequentially on the main thread but do not block pipeline
 coordination-other stages on async backends continue processing in
 parallel.
+
+## Inspecting a pipeline
+
+A pipeline can be stepped and inspected interactively without consuming
+it.
+[`pump_step()`](https://rolfsimoes.github.io/siphon/reference/pump_step.md)
+runs beats (advancing work through every stage),
+[`print()`](https://rdrr.io/r/base/print.html) shows per-stage
+occupancy, timing, and the bottleneck,
+[`pump_peek()`](https://rolfsimoes.github.io/siphon/reference/pump_peek.md)
+looks at ready results without removing them, and
+[`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
+resumes and finishes the remainder:
+
+``` r
+
+p <- 1:6 |>
+  pump(function(x) {
+    Sys.sleep(0.05)
+    x * 2
+  }, backend = "main") |>
+  pump(function(x) x + 1, backend = "main")
+
+pump_step(p, 3) # advance 3 beats; nothing is consumed
+```
+
+``` R
+## <pump pipeline>
+## ┌─ source (main)   pulled 3/6
+## ├─ stage 1 (main)
+## │    work [-] 0/1   out [------] 0/6   done 3   err 0
+## │    fn 50.1ms/item   coord 0.0ms/beat   beats(3): work 100% starv 0% block 0%
+## ├─ stage 2 (main)
+## │    work [-] 0/1   out [###---] 3/6   done 3   err 0
+## │    fn 0.0ms/item   coord 0.0ms/beat   beats(3): work 100% starv 0% block 0%
+## └─ sink   delivered 0/6
+```
+
+``` r
+
+print(p) # workers, buffers, per-stage times, beat states
+```
+
+``` R
+## <pump pipeline>
+## ┌─ source (main)   pulled 3/6
+## ├─ stage 1 (main)
+## │    work [-] 0/1   out [------] 0/6   done 3   err 0
+## │    fn 50.1ms/item   coord 0.0ms/beat   beats(3): work 100% starv 0% block 0%
+## ├─ stage 2 (main)
+## │    work [-] 0/1   out [###---] 3/6   done 3   err 0
+## │    fn 0.0ms/item   coord 0.0ms/beat   beats(3): work 100% starv 0% block 0%
+## └─ sink   delivered 0/6
+```
+
+``` r
+
+pump_peek(p) # look at the next ready result, non-destructively
+```
+
+``` R
+## [[1]]
+## [[1]]$id
+## [1] 1
+## 
+## [[1]]$idx
+## [1] 1
+## 
+## [[1]]$data
+## [1] 3
+## 
+## [[1]]$ok
+## [1] TRUE
+```
+
+``` r
+
+res <- pump_run(p, verbose = FALSE) # resumes; full ordered result
+print(res)
+```
+
+``` R
+## [[1]]
+## [1] 3
+## 
+## [[2]]
+## [1] 5
+## 
+## [[3]]
+## [1] 7
+## 
+## [[4]]
+## [1] 9
+## 
+## [[5]]
+## [1] 11
+## 
+## [[6]]
+## [1] 13
+```
+
+Use
+[`pump_pop()`](https://rolfsimoes.github.io/siphon/reference/pump_pop.md)
+only when you intend to consume an item yourself: it removes the item
+from the stream (a later
+[`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
+will not return it) and, for managed sources, transfers commit/release
+responsibility to you.
 
 See the
 [`vignette("siphon")`](https://rolfsimoes.github.io/siphon/articles/siphon.md)

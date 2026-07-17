@@ -67,6 +67,19 @@ pump(
 
 A pump object.
 
+## Details
+
+Stages implement a two-phase protocol: `$next_item()` runs one *beat*
+(harvest completed jobs into the output buffer, then refill free slots
+by pulling upstream — safe to call repeatedly) and `$pop_item()`
+consumes one ready result. For interactive use prefer the exported verbs
+[`pump_step()`](https://rolfsimoes.github.io/siphon/reference/pump_step.md),
+[`pump_peek()`](https://rolfsimoes.github.io/siphon/reference/pump_peek.md),
+and
+[`pump_pop()`](https://rolfsimoes.github.io/siphon/reference/pump_pop.md);
+inspect state with [`print()`](https://rdrr.io/r/base/print.html) or
+[`pump_status()`](https://rolfsimoes.github.io/siphon/reference/pump_status.md).
+
 ## Examples
 
 ``` r

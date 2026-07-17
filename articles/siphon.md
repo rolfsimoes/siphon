@@ -373,7 +373,7 @@ stage2 <- unique(vapply(res, function(v) v[["stage2_pid"]], numeric(1)))
 
 # often non-empty: nodes are pooled, not bound to a stage
 intersect(stage1, stage2)
-#. [1] 7414
+#. [1] 7233
 parallel_stop(bk)
 ```
 
@@ -469,28 +469,15 @@ pump_drain(f, verbose = FALSE, handle_fn = function(id, data, ok) {
 })
 
 print(snapshot)
-#. <pump_status>
-#.   Source (main):
-#.     length:   20
-#.     position: 7
-#.     errors:   0
-#.   Stage 1 (mirai):
-#.     workers: 2/2
-#.     buffer:  1/2
-#.     done:    5
-#.     errors:  0
-#.   Stage 2 (mirai):
-#.     workers: 1/1
-#.     buffer:  0/20
-#.     done:    3
-#.     errors:  0
-#.     polls:   3 hits, 12 misses (20% hit)
-#.     time:    93.1ms (fn: 90.6ms, idle: 2.5ms)
-#. 
-#.   Summary:
-#.     poll_wall_time: 5ms
-#.     fn:             91ms
-#.     idle:           3.1ms
+#. <pump_status (18)>
+#. ┌─ source   6/20
+#. ├─ stage 1 mirai
+#. │    wrk [#####] 2/2   buf [##---] 1/2    done 4   err 0
+#. │    fn 0.1ms/it   crd 0.2ms/bt   wrk 25% stv 0% blk 75%
+#. ├─ stage 2 mirai  * bottleneck
+#. │    wrk [-----] 0/1   buf [-----] 0/20   done 3   err 0
+#. │    fn 30.1ms/it   crd 0.1ms/bt   wrk 93% stv 7% blk 0%
+#. └─ sink   3/20
 
 mirai::daemons(0)
 ```
@@ -525,7 +512,7 @@ f <- 1:5 |> pump(function(x) x * 2, backend = "main")
 pump_drain(f, handle_fn = function(id, data, ok) {
     results[[id]] <<- data
 })
-#.   |                                                                              |                                                                      |   0%  |                                                                              |=====================                                                 |  30%  |                                                                              |===================================                                   |  50%  |                                                                              |=================================================                     |  70%  |                                                                              |===============================================================       |  90%  |                                                                              |======================================================================| 100%
+#.   |                                                                              |                                                                      |   0%  |                                                                              |==============                                                        |  20%  |                                                                              |============================                                          |  40%  |                                                                              |==========================================                            |  60%  |                                                                              |========================================================              |  80%  |                                                                              |======================================================================| 100%
 print(results)
 #. [[1]]
 #. [1] 2
@@ -738,28 +725,15 @@ pump_run(f, verbose = FALSE)
 
 # Source position, per-stage completed/errors, and a fn-vs-idle timing summary
 print(pump_status(f))
-#. <pump_status>
-#.   Source (main):
-#.     length:   5
-#.     position: 5
-#.     errors:   0
-#.   Stage 1 (mirai):
-#.     workers: 0/2
-#.     buffer:  0/5
-#.     done:    5
-#.     errors:  0
-#.   Stage 2 (mirai):
-#.     workers: 0/2
-#.     buffer:  0/5
-#.     done:    5
-#.     errors:  0
-#.     polls:   5 hits, 6 misses (45.5% hit)
-#.     time:    2.5ms (fn: 0.1ms, idle: 2.4ms)
-#. 
-#.   Summary:
-#.     poll_wall_time: 4.6ms
-#.     fn:             51.2ms
-#.     idle:           3.3ms
+#. <pump_status (17)>
+#. ┌─ source   5/5
+#. ├─ stage 1 mirai
+#. │    wrk [-----] 0/2   buf [-----] 0/5   done 5   err 0
+#. │    fn 10.2ms/it   crd 0.1ms/bt   wrk 100% stv 0% blk 0%
+#. ├─ stage 2 mirai
+#. │    wrk [-----] 0/2   buf [-----] 0/5   done 5   err 0
+#. │    fn 0.0ms/it   crd 0.1ms/bt   wrk 80% stv 20% blk 0%
+#. └─ sink   5/5
 
 mirai::daemons(0)
 ```
