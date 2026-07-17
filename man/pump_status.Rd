@@ -10,34 +10,147 @@ pump_status(x)
 \item{x}{A pump object.}
 }
 \value{
-A list with:
+A list of class \code{pump_status}. For a pipeline it contains \code{source}
+(source info) and \code{stages}, a list with one entry per stage:
 \itemize{
-\item \code{buffer_size} - current items in the output buffer.
-\item \code{buffer_capacity} - maximum buffer size.
-\item \code{workers_active} - currently running jobs.
-\item \code{workers_limit} - maximum concurrent jobs for this stage.
+\item \code{type} - backend name (\code{"main"}, \code{"mirai"}, \code{"future"}, \code{"parallel"}).
+\item \code{workers_active} / \code{workers_limit} - in-flight jobs vs slot limit.
+\item \code{buffer_size} / \code{buffer_capacity} - items ready in the output buffer.
 \item \code{completed} - items that have finished this stage.
 \item \code{errors} - items with \code{ok = FALSE} seen by this stage.
-\item \code{poll_hits} - number of successful polls (items ready).
-\item \code{poll_misses} - number of failed polls (no item ready).
-\item \code{poll_wall_time} - total time spent inside \code{next_item()} calls in milliseconds.
-\item \code{fn_time} - wall-clock time spent executing the user function (useful work) in milliseconds.
-\item \code{idle_time} - time spent waiting (starvation or exhaustion) in milliseconds.
+\item \code{beats} - number of effective \code{next_item()} calls (beats) on this
+stage. Beats on a finished stage are no-ops and are not counted.
+\item \code{beats_working}, \code{beats_starved}, \code{beats_blocked} - how each beat was
+classified (see Details).
+\item \code{pop_hits} / \code{pop_misses} - \code{pop_item()} calls that returned an item
+vs \code{NULL}.
+\item \code{fn_time} - cumulative time executing the user function, in
+milliseconds. On asynchronous backends this sums time across workers
+and can exceed real elapsed time.
+\item \code{tick_time} - cumulative time inside \code{next_item()} calls (ms).
+\item \code{submit_time} - cumulative time dispatching jobs to the backend (ms).
+For the synchronous main backend this includes the function execution
+itself; for asynchronous backends it is serialization/dispatch cost.
+\item \code{pull_time} - cumulative time spent asking upstream for items (ms).
+This includes the upstream stages' own beats, so it is reported on
+the upstream stages and excluded from this stage's \code{coord_time}.
+\item \code{coord_time} - derived scheduling overhead for this stage alone:
+\code{max(0, tick_time - submit_time - pull_time)} (ms).
+\item \code{fn_per_item} - average \code{fn_time} per completed item (ms).
+\item \code{share_working} / \code{share_starved} / \code{share_blocked} - beat-state
+shares in \verb{[0, 1]} (\code{NA} before the first beat).
+\item \code{throughput} - completed items per second over the observed beat span
+(\code{NA} until two beats have happened; the span includes any pauses
+between interactive calls).
+\item \code{in_flight} - one entry per active slot: \code{id}, \code{idx}, and \code{since}
+(submission time) of the item currently being processed.
+\item \code{buffered_ids} - ids of the first few items ready in the buffer.
 }
+
+For plain sources the result is flat and reports \code{completed}, \code{errors},
+\code{pop_hits}, \code{pop_misses}, and \code{pull_time} (ms inside \code{pop_item()}).
+For pipelines, the last stage's fields are also copied to the top level
+for convenience, plus \code{delivered} - the number of items that left the
+pipeline (popped from the terminal stage by \code{pump_run()}, \code{pump_pop()},
+or \code{pop_item()}); shown as the sink in \code{print()}.
 }
 \description{
 \code{pump_status()} returns a snapshot of a pump object's internal state,
-including detailed timing metrics that help identify where time is spent.
+including per-stage timing metrics that help identify where time is spent
+and which stage is the bottleneck.
 }
 \details{
-Note that \code{poll_wall_time} excludes time spent in backoff sleeps
-(controlled by the \code{sleep_ms} parameter in \code{pump_run()} and \code{pump_drain()}).
-Total wall-clock time when using \code{pump_run()} is approximately
-\code{poll_wall_time + poll_misses * sleep_ms}. For fast operations,
-the backoff overhead can dominate total runtime. siphon is designed for
-pipelines with substantial work per item \strong{where coordination overhead is
-negligible compared to actual work time}.
+Durations are accumulated only inside \code{next_item()}/\code{pop_item()}
+calls: time between beats (interactive pauses, \code{sleep_ms} backoff in
+\code{pump_run()}) is deliberately never measured. Idle time is therefore not
+reported as a duration; instead each beat is classified, in priority
+order:
+\itemize{
+\item \code{blocked} - the output buffer is full while jobs are still in flight:
+downstream is not consuming. This wins over \code{working} because it is
+the bottleneck signal.
+\item \code{working} - jobs in flight, or items delivered during this beat.
+\item \code{starved} - free slots, but upstream had nothing to offer.
 }
+
+A beat that finds the stage finished (upstream exhausted, nothing in
+flight) cannot move anything and is not recorded, so beat counts and
+shares freeze once a pipeline is exhausted.
+
+Under \code{pump_run()} beats are frequent, so beat shares approximate time
+shares. When stepping interactively, shares describe what each beat
+found.
+}
+\section{Display}{
+
+The status can be displayed using \code{print()} or \code{format()}. The display shows
+a connected frame from source to sink with worker and buffer occupancy per
+stage, timing, beat-state shares, a stuck-job warning for old in-flight
+items, and a \verb{* bottleneck} marker when one stage clearly dominates.
+
+The header shows the class name followed by the total number of beats
+(pipeline scheduling cycles) in parentheses, e.g., \verb{<pump (10)>}.
+}
+
+\section{Legend}{
+
+Compressed labels used in the output:
+\describe{
+\item{wrk}{workers (active/limit)}
+\item{buf}{output buffer (size/capacity)}
+\item{done}{completed items}
+\item{err}{errors}
+\item{fn}{function time per item}
+\item{crd}{coordination time per beat}
+\item{wrk/stv/blk}{working/starved/blocked beat shares}
+}
+}
+
+\section{Customization}{
+
+Colors can be customized via \code{options(siphon.colors = list(...))} to override
+specific elements. The system uses standard 16-color ANSI codes:
+\describe{
+\item{bold = "1"}{bold text}
+\item{dim = "2"}{dimmed text}
+\item{blue = "34"}{primary color}
+\item{green = "32"}{success}
+\item{yellow = "33"}{warning}
+\item{red = "31"}{error}
+\item{bright_blue = "94"}{bright primary}
+\item{bright_green = "92"}{bright success}
+\item{bright_yellow = "93"}{bright warning}
+\item{bright_red = "91"}{bright error}
+}
+
+Element-specific color names:
+\describe{
+\item{header}{pipeline header text}
+\item{source}{"source" label}
+\item{sink}{"sink" label}
+\item{stage}{stage number (e.g., "stage 1")}
+\item{backend}{backend name (e.g., "main", "mirai")}
+\item{wrk}{workers label}
+\item{buf}{buffer label}
+\item{done}{completed label}
+\item{err}{errors label}
+\item{fn}{function time label}
+\item{crd}{coordination time label}
+\item{beat}{beats label}
+\item{wrk_share}{working share label}
+\item{stv}{starved share label}
+\item{blk}{blocked share label}
+\item{bottleneck}{bottleneck marker}
+}
+
+Examples:
+\code{options(siphon.colors = list(stage = "96"))} to make stage names cyan
+\code{options(siphon.colors = list(wrk = "1;34"))} to make workers label bold blue
+\code{options(siphon.colors = list(bright_red = "35"))} to change error color to purple
+
+To disable colors globally, set \code{options(siphon.color = FALSE)}.
+}
+
 \examples{
 f <- 1:5 |> pump(function(x) x * 2, backend = "main")
 pump_status(f)

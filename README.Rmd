@@ -57,6 +57,7 @@ print(res)
 - **Concurrency control** - Per-stage `max_workers` to manage resource constraints
 - **Error handling** - Flexible error policies: `"collect"`, `"stop"`, or `"continue"`
 - **Timeout protection** - Optional `timeout` in `pump_run()` to avoid infinite polling
+- **Interactive inspection** - `pump_step()`, `pump_peek()`, `pump_pop()`, and a rich `print()` to step through and debug a live pipeline
 - **Status inspection** - `pump_status()` for monitoring pipeline state
 - **Order preservation** - Results returned in original input order regardless of execution order
 - **Custom sources** - `pump_source()` to connect external data sources (queues, databases, files)
@@ -68,6 +69,35 @@ constraints per stage, such as CPU preparation, main-thread GPU dispatch, and
 parallel I/O. Note that stages using `main_backend()` run sequentially on the
 main thread but do not block pipeline coordination-other stages on async
 backends continue processing in parallel.
+
+## Inspecting a pipeline
+
+A pipeline can be stepped and inspected interactively without consuming it.
+`pump_step()` runs beats (advancing work through every stage), `print()`
+shows per-stage occupancy, timing, and the bottleneck, `pump_peek()` looks
+at ready results without removing them, and `pump_run()` resumes and
+finishes the remainder:
+
+```{r}
+p <- 1:6 |>
+  pump(function(x) {
+    Sys.sleep(0.05)
+    x * 2
+  }, backend = "main") |>
+  pump(function(x) x + 1, backend = "main")
+
+pump_step(p, 3) # advance 3 beats; nothing is consumed
+print(p) # workers, buffers, per-stage times, beat states
+
+pump_peek(p) # look at the next ready result, non-destructively
+
+res <- pump_run(p, verbose = FALSE) # resumes; full ordered result
+print(res)
+```
+
+Use `pump_pop()` only when you intend to consume an item yourself: it
+removes the item from the stream (a later `pump_run()` will not return it)
+and, for managed sources, transfers commit/release responsibility to you.
 
 See the `vignette("siphon")` for a longer introduction with error handling and
 status inspection examples.

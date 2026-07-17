@@ -45,6 +45,14 @@ A pump object.
 source when it has free slots, submits jobs to the selected backend, and
 yields completed items to downstream stages.
 }
+\details{
+Stages implement a two-phase protocol: \verb{$next_item()} runs one \emph{beat}
+(harvest completed jobs into the output buffer, then refill free slots by
+pulling upstream — safe to call repeatedly) and \verb{$pop_item()} consumes one
+ready result. For interactive use prefer the exported verbs \code{\link[=pump_step]{pump_step()}},
+\code{\link[=pump_peek]{pump_peek()}}, and \code{\link[=pump_pop]{pump_pop()}}; inspect state with \code{print()} or
+\code{\link[=pump_status]{pump_status()}}.
+}
 \examples{
 # Single stage pipeline
 f <- 1:5 |> pump(function(x) x * 2, backend = "main")
