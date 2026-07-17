@@ -2,7 +2,7 @@
 #'
 #' `pump_run()` drains a siphon pipeline until all upstream sources, active slots, and
 #' output buffers are complete. Results are collected in the original input
-#' order using internal sequential indices (idx).
+#' order using internal sequential indices (`idx`).
 #'
 #' @param x A pump object or a finite R object.
 #' @param sleep_ms Delay between polls when no item is ready.

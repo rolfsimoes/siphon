@@ -9,7 +9,7 @@
 #' chain of stages. Each stage pulls work from its upstream source when it has
 #' free slots, submits jobs to a backend (main, mirai, future, parallel), and yields
 #' completed items downstream. Results are collected by `pump_run()` in the
-#' original input order via sequential internal indices (idx).
+#' original input order via sequential internal indices (`idx`).
 #'
 #' @section Backends:
 #' \describe{

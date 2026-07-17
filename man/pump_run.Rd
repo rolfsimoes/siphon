@@ -40,7 +40,7 @@ stage are omitted entirely; the result may be shorter than the input.
 \description{
 \code{pump_run()} drains a siphon pipeline until all upstream sources, active slots, and
 output buffers are complete. Results are collected in the original input
-order using internal sequential indices (idx).
+order using internal sequential indices (\code{idx}).
 }
 \details{
 The timeout parameter is checked cooperatively between polling

@@ -10,7 +10,7 @@ siphon provides a pull-based pipeline runtime where items flow through a
 chain of stages. Each stage pulls work from its upstream source when it has
 free slots, submits jobs to a backend (main, mirai, future, parallel), and yields
 completed items downstream. Results are collected by \code{pump_run()} in the
-original input order via sequential internal indices (idx).
+original input order via sequential internal indices (\code{idx}).
 }
 \details{
 A small runtime for pull-based staged pipelines. siphon connects item

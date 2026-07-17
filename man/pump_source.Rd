@@ -29,15 +29,15 @@ Defaults to \code{NULL} (source never finishes on its own).}
 by \code{pump_run()} and \code{pump_drain()} when execution completes.}
 
 \item{length}{The total number of items to expect. Defaults to \code{Inf}.
-Used by \code{pump_run()} for result pre-allocation and progress reporting.}
+Used by \code{pump_run()} for result preallocation and progress reporting.}
 
 \item{item_commit_fn}{An optional function called when an item successfully
 completes the pipeline. Receives \code{id} and \code{data} arguments. Used for
-acknowledging external resources (e.g., message queue ack).}
+acknowledging external resources (e.g., message queue \code{ack}).}
 
 \item{item_abort_fn}{An optional function called when an item fails.
 Receives \code{id}, \code{error}, and \code{data} arguments. Used for rejecting external
-resources (e.g., message queue nack).}
+resources (e.g., message queue \code{nack}).}
 
 \item{item_release_fn}{An optional function called when an item is released
 from the pipeline (e.g., on timeout or shutdown). Receives \code{id} argument.}
