@@ -73,6 +73,7 @@ mirai_backend <- function() {
 #'
 #' @param x A mirai backend object.
 #' @param ... Unused.
+#' @return The input `x`, invisibly.
 #' @export
 print.pump_mirai_backend <- function(x, ...) {
     cat("<pump_mirai_backend>\n")

@@ -11,6 +11,9 @@
 
 \item{...}{Unused.}
 }
+\value{
+The input \code{x}, invisibly.
+}
 \description{
 Displays a pipeline as a connected frame from source to sink.
 

@@ -385,6 +385,7 @@ format.pump_status <- function(x, ...,
 #' @description Displays a pump_status snapshot.
 #' @param x A pump_status object.
 #' @param ... Unused.
+#' @return The input `x`, invisibly.
 #' @export
 print.pump_status <- function(x, ...) {
     cat(format(x), sep = "\n")
@@ -470,6 +471,7 @@ format.pump <- function(x, ...) {
 #'
 #' @param x A pump object.
 #' @param ... Unused.
+#' @return The input `x`, invisibly.
 #' @export
 print.pump <- function(x, ...) {
     cat(format(x), sep = "\n")

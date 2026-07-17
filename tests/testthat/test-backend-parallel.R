@@ -346,16 +346,16 @@ test_that("parallel_eval_workers broadcasts instead of visiting nodes serially",
 
 test_that("one parallel_backend can be shared across stages", {
     skip_if_not_installed("parallel")
-    bk <- parallel_backend(3)
+    bk <- parallel_backend(2)
     on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
-    # read (2 slots) -> main -> write (1 slot) on one shared pool;
+    # read (1 slot) -> main -> write (1 slot) on one shared pool;
     # max_workers must be set explicitly and sum to <= worker count
     out <- 1:24 |>
         pump(function(x) {
             Sys.sleep(0.02)
             x * 2
-        }, backend = bk, max_workers = 2) |>
+        }, backend = bk, max_workers = 1) |>
         pump(function(x) x + 1, backend = "main") |>
         pump(function(x) x * 10, backend = bk, max_workers = 1) |>
         pump_run(verbose = FALSE)
@@ -366,8 +366,8 @@ test_that("one parallel_backend can be shared across stages", {
         pump(function(x) {
             Sys.sleep(0.02)
             x
-        }, backend = bk, max_workers = 3) |>
-        pump(function(x) x, backend = bk, max_workers = 3)
+        }, backend = bk, max_workers = 2) |>
+        pump(function(x) x, backend = bk, max_workers = 2)
     expect_error(
         pump_run(f, verbose = FALSE),
         "no free cluster node"

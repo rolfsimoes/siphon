@@ -31,6 +31,7 @@ main_backend <- function() {
 #'
 #' @param x A main backend object.
 #' @param ... Unused.
+#' @return The input `x`, invisibly.
 #' @export
 print.pump_main_backend <- function(x, ...) {
     cat("<pump_main_backend>\n")

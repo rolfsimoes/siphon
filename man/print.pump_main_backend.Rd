@@ -11,6 +11,9 @@
 
 \item{...}{Unused.}
 }
+\value{
+The input \code{x}, invisibly.
+}
 \description{
 Print a main backend
 }

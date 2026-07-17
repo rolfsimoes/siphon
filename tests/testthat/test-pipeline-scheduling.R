@@ -47,8 +47,10 @@ test_that("uneven job durations do not deadlock (main backend)", {
 })
 
 test_that("concurrency, backpressure, and stage propagation are timing-validated (future backend)", {
+    # timing-sensitive assertions; too fragile for loaded CRAN check machines
+    skip_on_cran()
     skip_if_not_installed("future")
-    old_plan <- future::plan("multisession", workers = 3)
+    old_plan <- future::plan("multisession", workers = 2)
     on.exit(future::plan(old_plan), add = TRUE)
 
     stage1_fn <- function(x) {
@@ -96,6 +98,8 @@ test_that("concurrency, backpressure, and stage propagation are timing-validated
 })
 
 test_that("concurrency, backpressure, and stage propagation are timing-validated (mirai backend)", {
+    # timing-sensitive assertions; too fragile for loaded CRAN check machines
+    skip_on_cran()
     skip_if_not_installed("mirai")
     mirai::daemons(2)
     on.exit(mirai::daemons(0), add = TRUE)

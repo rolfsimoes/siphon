@@ -70,6 +70,7 @@ future_backend <- function() {
 #'
 #' @param x A future backend object.
 #' @param ... Unused.
+#' @return The input `x`, invisibly.
 #' @export
 print.pump_future_backend <- function(x, ...) {
     cat("<pump_future_backend>\n")

@@ -715,6 +715,7 @@ parallel_stop <- function(backend, force = FALSE) {
 #'
 #' @param x A parallel backend object.
 #' @param ... Unused.
+#' @return The input `x`, invisibly.
 #' @export
 print.pump_parallel_backend <- function(x, ...) {
     cat("<pump_parallel_backend>\n")

@@ -11,6 +11,9 @@
 
 \item{...}{Unused.}
 }
+\value{
+The input \code{x}, invisibly.
+}
 \description{
 Displays a pump_status snapshot.
 }
