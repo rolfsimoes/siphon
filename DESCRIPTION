@@ -1,7 +1,7 @@
 Package: siphon
 Type: Package
 Title: Pull-Based Staged Pipelines
-Version: 0.5.0
+Version: 0.6.0
 Depends: R (>= 4.1.0)
 Authors@R: c(
     person(
@@ -21,6 +21,7 @@ BugReports: https://github.com/rolfsimoes/siphon/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests:
+    cli,
     future,
     jsonlite,
     knitr,
