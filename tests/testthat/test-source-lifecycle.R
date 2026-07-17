@@ -98,7 +98,7 @@ test_that("pump_managed_source() validates arguments", {
     ), "pull_fn must be a function")
 
     expect_error(pump_managed_source(
-        pull_fn = function() NULL,
+        pull_fn = function() invisible(NULL),
         id_fn = "not a function",
         data_fn = function(x) x,
         commit_fn = function(x, y) NULL,
@@ -106,7 +106,7 @@ test_that("pump_managed_source() validates arguments", {
     ), "id_fn must be a function")
 
     expect_error(pump_managed_source(
-        pull_fn = function() NULL,
+        pull_fn = function() invisible(NULL),
         id_fn = function(x) x,
         data_fn = "not a function",
         commit_fn = function(x, y) NULL,
@@ -114,7 +114,7 @@ test_that("pump_managed_source() validates arguments", {
     ), "data_fn must be a function")
 
     expect_error(pump_managed_source(
-        pull_fn = function() NULL,
+        pull_fn = function() invisible(NULL),
         id_fn = function(x) x,
         data_fn = function(x) x,
         commit_fn = "not a function",
@@ -122,7 +122,7 @@ test_that("pump_managed_source() validates arguments", {
     ), "commit_fn must be a function")
 
     expect_error(pump_managed_source(
-        pull_fn = function() NULL,
+        pull_fn = function() invisible(NULL),
         id_fn = function(x) x,
         data_fn = function(x) x,
         commit_fn = function(x, y) NULL,
@@ -130,7 +130,7 @@ test_that("pump_managed_source() validates arguments", {
     ), "abort_fn must be a function")
 
     expect_error(pump_managed_source(
-        pull_fn = function() NULL,
+        pull_fn = function() invisible(NULL),
         id_fn = function(x) x,
         data_fn = function(x) x,
         commit_fn = function(x, y) NULL,
@@ -159,15 +159,18 @@ test_that("pump_managed_source() pull_fn returning NULL produces no item", {
         abort_fn = function(x, y, z) NULL
     )
 
-    result1 <- source$next_item()
+    source$next_item()
+    result1 <- source$pop_item()
     expect_false(is.null(result1))
     expect_equal(result1$id, 1)
 
-    result2 <- source$next_item()
+    source$next_item()
+    result2 <- source$pop_item()
     expect_false(is.null(result2))
     expect_equal(result2$id, 2)
 
-    result3 <- source$next_item()
+    source$next_item()
+    result3 <- source$pop_item()
     expect_true(is.null(result3))
 })
 
@@ -180,7 +183,8 @@ test_that("pump_managed_source() id_fn defines the emitted id", {
         abort_fn = function(x, y, z) NULL
     )
 
-    result <- source$next_item()
+    source$next_item()
+    result <- source$pop_item()
     expect_equal(result$id, 123)
 })
 
@@ -193,7 +197,8 @@ test_that("pump_managed_source() data_fn defines the emitted data", {
         abort_fn = function(x, y, z) NULL
     )
 
-    result <- source$next_item()
+    source$next_item()
+    result <- source$pop_item()
     expect_equal(result$data, "test")
 })
 
@@ -206,7 +211,8 @@ test_that("pump_managed_source() data_fn errors set ok to FALSE", {
         abort_fn = function(x, y, z) NULL
     )
 
-    result <- source$next_item()
+    source$next_item()
+    result <- source$pop_item()
     expect_false(result$ok)
     expect_true(inherits(result$data, "error"))
 })
@@ -229,6 +235,7 @@ test_that("pump_managed_source() successful terminal item calls commit_fn", {
     )
 
     source$next_item()
+    source$pop_item()
     source$item_commit(1, "test")
 
     expect_true(commit_called)
@@ -253,6 +260,7 @@ test_that("pump_managed_source() successful terminal item calls release_fn if su
     )
 
     source$next_item()
+    source$pop_item()
     source$item_commit(1, "test")
     source$item_release(1)
 
@@ -280,6 +288,7 @@ test_that("pump_managed_source() failed terminal handler calls abort_fn", {
     )
 
     source$next_item()
+    source$pop_item()
     source$item_abort(1, error = "error", data = "test")
 
     expect_true(abort_called)
@@ -302,6 +311,7 @@ test_that("pump_managed_source() close_fn aborts pending items before closing", 
     )
 
     source$next_item()
+    source$pop_item()
     source$close()
 
     expect_length(abort_calls, 1)
@@ -326,6 +336,7 @@ test_that("pump_managed_source() close_fn calls user close_fn after draining", {
     )
 
     source$next_item()
+    source$pop_item()
     source$close()
 
     expect_true(abort_called)

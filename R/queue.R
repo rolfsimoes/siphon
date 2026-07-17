@@ -34,6 +34,19 @@
             size <<- size - 1L
             x
         },
+        peek = function(n = 1L) {
+            n <- min(as.integer(n), size)
+            if (n < 1L) {
+                return(list())
+            }
+            out <- vector("list", n)
+            j <- head
+            for (k in seq_len(n)) {
+                out[[k]] <- buf[[j]]
+                j <- inc(j)
+            }
+            out
+        },
         remaining = function() capacity - size,
         size = function() size
     )

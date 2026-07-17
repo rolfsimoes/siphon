@@ -64,34 +64,26 @@
         err_count
     }
 
-    # polling statistics
-    poll_hits <- 0L
-    poll_misses <- 0L
-    wall_time <- 0.0
-    # timing statistics
-    fn_time <- 0.0
-    idle_time <- 0.0
+    # statistics: pop hit/miss counts and time spent inside pop_item() (ms)
+    pop_hits <- 0L
+    pop_misses <- 0L
+    pull_time <- 0.0
 
     # public methods
     self <- list(
-        next_item = function() {
-            # Measure timing
-            start_time <- Sys.time()
+        next_item = function() invisible(NULL),
+        pop_item = function() {
+            t0 <- .pump_now_ms()
 
             if (i >= n) {
-                end_time <- Sys.time()
-                elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
-                wall_time <<- wall_time + elapsed
-                poll_misses <<- poll_misses + 1L
-                idle_time <<- idle_time + elapsed
+                pull_time <<- pull_time + (.pump_now_ms() - t0)
+                pop_misses <<- pop_misses + 1L
                 return(NULL)
             }
             i <<- i + 1L
             data <- original_data[[i]]
-            end_time <- Sys.time()
-            elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
-            wall_time <<- wall_time + elapsed
-            poll_hits <<- poll_hits + 1L
+            pull_time <<- pull_time + (.pump_now_ms() - t0)
+            pop_hits <<- pop_hits + 1L
             list(
                 id = i,
                 idx = i,
@@ -101,22 +93,22 @@
         },
         length = function() n,
         pipeline_length = function() n,
-        buffer = function() NULL,
-        slots = function() NULL,
+        buffer = function() invisible(NULL),
+        slots = function() invisible(NULL),
         progress = function() i,
         stage_completed = function() i,
         errors = function() get_err_count(),
-        poll_hits = function() poll_hits,
-        poll_misses = function() poll_misses,
-        poll_wall_time = function() wall_time,
-        fn_time = function() fn_time,
-        idle_time = function() idle_time,
+        stats = function() {
+            list(
+                pop_hits = pop_hits,
+                pop_misses = pop_misses,
+                pull_time = pull_time
+            )
+        },
         reset_stats = function() {
-            poll_hits <<- 0L
-            poll_misses <<- 0L
-            wall_time <<- 0.0
-            fn_time <<- 0.0
-            idle_time <<- 0.0
+            pop_hits <<- 0L
+            pop_misses <<- 0L
+            pull_time <<- 0.0
         },
         done = function() i == n,
         close = function() invisible(NULL),
@@ -224,25 +216,18 @@ pump_source <- function(pull_fn,
 
     internal_ordinal <- 0L
     default_backend <- "main"
-    # polling statistics
-    poll_hits <- 0L
-    poll_misses <- 0L
-    wall_time <- 0.0
-    # timing statistics
-    fn_time <- 0.0
-    idle_time <- 0.0
+    # statistics: pop hit/miss counts and time spent inside pop_item() (ms)
+    pop_hits <- 0L
+    pop_misses <- 0L
+    pull_time <- 0.0
 
     wrapped_pull_fn <- function() {
-        # Measure timing
-        start_time <- Sys.time()
+        t0 <- .pump_now_ms()
 
         msg <- pull_fn()
         if (is.null(msg)) {
-            end_time <- Sys.time()
-            elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
-            wall_time <<- wall_time + elapsed
-            poll_misses <<- poll_misses + 1L
-            idle_time <<- idle_time + elapsed
+            pull_time <<- pull_time + (.pump_now_ms() - t0)
+            pop_misses <<- pop_misses + 1L
             return(NULL)
         }
         if (!is.list(msg) || !all(c("id", "data", "ok") %in% names(msg))) {
@@ -256,33 +241,32 @@ pump_source <- function(pull_fn,
         }
         internal_ordinal <<- internal_ordinal + 1L
         msg$idx <- internal_ordinal
-        end_time <- Sys.time()
-        elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
-        wall_time <<- wall_time + elapsed
-        poll_hits <<- poll_hits + 1L
+        pull_time <<- pull_time + (.pump_now_ms() - t0)
+        pop_hits <<- pop_hits + 1L
         msg
     }
 
     self <- list(
-        next_item = wrapped_pull_fn,
+        next_item = function() invisible(NULL),
+        pop_item = wrapped_pull_fn,
         length = length_fn,
         pipeline_length = length_fn,
-        buffer = function() NULL,
-        slots = function() NULL,
+        buffer = function() invisible(NULL),
+        slots = function() invisible(NULL),
         progress = function() 0L,
         stage_completed = function() 0L,
         errors = function() 0L,
-        poll_hits = function() poll_hits,
-        poll_misses = function() poll_misses,
-        poll_wall_time = function() wall_time,
-        fn_time = function() fn_time,
-        idle_time = function() idle_time,
+        stats = function() {
+            list(
+                pop_hits = pop_hits,
+                pop_misses = pop_misses,
+                pull_time = pull_time
+            )
+        },
         reset_stats = function() {
-            poll_hits <<- 0L
-            poll_misses <<- 0L
-            wall_time <<- 0.0
-            fn_time <<- 0.0
-            idle_time <<- 0.0
+            pop_hits <<- 0L
+            pop_misses <<- 0L
+            pull_time <<- 0.0
         },
         done = done_resolved,
         close = close_resolved,

@@ -1,18 +1,24 @@
 test_that("source item ids are sequential", {
     src <- .pump_source_basic(list(10, 20, 30))
-    expect_equal(src$next_item()$id, 1)
-    expect_equal(src$next_item()$id, 2)
-    expect_equal(src$next_item()$id, 3)
+    src$next_item()
+    expect_equal(src$pop_item()$id, 1)
+    src$next_item()
+    expect_equal(src$pop_item()$id, 2)
+    src$next_item()
+    expect_equal(src$pop_item()$id, 3)
 })
 
 test_that("source is done after exhaustion", {
     src <- .pump_source_basic(list(1, 2))
     expect_false(src$done())
     src$next_item()
+    src$pop_item()
     expect_false(src$done())
     src$next_item()
+    src$pop_item()
     expect_true(src$done())
-    expect_null(src$next_item())
+    src$next_item()
+    expect_null(src$pop_item())
 })
 
 test_that("source handles empty input", {
@@ -26,16 +32,22 @@ test_that("source marks captured error items as not ok, but not general error ob
     e_legit <- simpleError("bad")
     e_captured <- siphon:::.pump_error(simpleError("captured"))
     src <- .pump_source_basic(list(1, e_legit, e_captured))
-    expect_true(src$next_item()$ok)
-    expect_true(src$next_item()$ok)
-    expect_false(src$next_item()$ok)
+    src$next_item()
+    expect_true(src$pop_item()$ok)
+    src$next_item()
+    expect_true(src$pop_item()$ok)
+    src$next_item()
+    expect_false(src$pop_item()$ok)
 })
 
 test_that("source passes through data correctly", {
     src <- .pump_source_basic(list("a", 2, TRUE))
-    expect_equal(src$next_item()$data, "a")
-    expect_equal(src$next_item()$data, 2)
-    expect_equal(src$next_item()$data, TRUE)
+    src$next_item()
+    expect_equal(src$pop_item()$data, "a")
+    src$next_item()
+    expect_equal(src$pop_item()$data, 2)
+    src$next_item()
+    expect_equal(src$pop_item()$data, TRUE)
 })
 
 test_that("source length and pipeline_length match", {
@@ -57,16 +69,20 @@ test_that("pump_source creates custom source", {
     )
     expect_equal(length(src), 3)
     expect_false(src$done())
-    expect_equal(src$next_item()$data, 10)
-    expect_equal(src$next_item()$data, 20)
-    expect_equal(src$next_item()$data, 30)
-    expect_null(src$next_item())
+    src$next_item()
+    expect_equal(src$pop_item()$data, 10)
+    src$next_item()
+    expect_equal(src$pop_item()$data, 20)
+    src$next_item()
+    expect_equal(src$pop_item()$data, 30)
+    src$next_item()
+    expect_null(src$pop_item())
     expect_true(src$done())
 })
 
 test_that("pump_source defaults to infinite source", {
     src <- pump_source(
-        pull_fn = function() NULL
+        pull_fn = function() invisible(NULL)
     )
     expect_equal(length(src), Inf)
     expect_false(src$done())
@@ -75,7 +91,7 @@ test_that("pump_source defaults to infinite source", {
 test_that("pump_source close_fn is callable", {
     closed <- FALSE
     src <- pump_source(
-        pull_fn = function() NULL,
+        pull_fn = function() invisible(NULL),
         close_fn = function() closed <<- TRUE
     )
     src$close()
@@ -85,23 +101,28 @@ test_that("pump_source close_fn is callable", {
 test_that("pump_source validates pull_fn output format", {
     # Missing required keys
     src <- pump_source(pull_fn = function() list(id = 1, data = "hello"))
-    expect_error(src$next_item(), "pull_fn must return NULL or a list with 'id', 'data', and 'ok' elements")
+    src$next_item()
+    expect_error(src$pop_item(), "pull_fn must return NULL or a list with 'id', 'data', and 'ok' elements")
 
     # NULL id
     src2 <- pump_source(pull_fn = function() list(id = NULL, data = "hello", ok = TRUE))
-    expect_error(src2$next_item(), "pull_fn must return items with a valid scalar atomic 'id'")
+    src2$next_item()
+    expect_error(src2$pop_item(), "pull_fn must return items with a valid scalar atomic 'id'")
 
     # Non-scalar id
     src3 <- pump_source(pull_fn = function() list(id = 1:2, data = "hello", ok = TRUE))
-    expect_error(src3$next_item(), "pull_fn must return items with a valid scalar atomic 'id'")
+    src3$next_item()
+    expect_error(src3$pop_item(), "pull_fn must return items with a valid scalar atomic 'id'")
 
     # Non-atomic list id
     src_list_id <- pump_source(pull_fn = function() list(id = list("abc"), data = "hello", ok = TRUE))
-    expect_error(src_list_id$next_item(), "pull_fn must return items with a valid scalar atomic 'id'")
+    src_list_id$next_item()
+    expect_error(src_list_id$pop_item(), "pull_fn must return items with a valid scalar atomic 'id'")
 
     # Non-scalar or invalid ok
     src4 <- pump_source(pull_fn = function() list(id = 1, data = "hello", ok = "yes"))
-    expect_error(src4$next_item(), "pull_fn must return items with a valid scalar logical 'ok'")
+    src4$next_item()
+    expect_error(src4$pop_item(), "pull_fn must return items with a valid scalar logical 'ok'")
 })
 
 test_that("pump_run handles arbitrary non-integer and large integer ids", {
@@ -143,13 +164,14 @@ test_that("pump_run handles arbitrary non-integer and large integer ids", {
 test_that("pump_run throws error if idx is missing", {
     # If a source somehow bypasses pump_source wrapping or doesn't have idx
     src <- structure(list(
-        next_item = function() {
+        next_item = function() invisible(NULL),
+        pop_item = function() {
             list(id = "abc", data = "hello", ok = TRUE) # no idx!
         },
         length = function() Inf,
         pipeline_length = function() Inf,
-        buffer = function() NULL,
-        slots = function() NULL,
+        buffer = function() invisible(NULL),
+        slots = function() invisible(NULL),
         progress = function() 0L,
         stage_completed = function() 0L,
         errors = function() 0L,

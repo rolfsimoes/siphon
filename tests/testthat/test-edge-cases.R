@@ -44,6 +44,7 @@ test_that("progress accounting for one, two, and three stages", {
     expect_equal(f3$pipeline_length(), 8)
 
     f3$next_item()
+    f3$pop_item()
     expect_true(f3$progress() > 0)
 })
 

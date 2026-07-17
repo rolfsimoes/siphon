@@ -626,17 +626,17 @@ parallel_stop <- function(backend, force = FALSE) {
     length(backend$state$cl)
 }
 #' @export
-.pump_executor_new_job.pump_parallel_backend <- function(backend, fn, args) {
+.pump_executor_new_job.pump_parallel_backend <- function(backend, func, args) {
     worker_id <- .parallel_submit_job(
         backend = backend,
-        fn = fn,
+        fn = func,
         args = args
     )
 
     job_state <- new.env(parent = emptyenv())
     job_state$backend <- backend
     job_state$worker_id <- worker_id
-    job_state$fn <- fn
+    job_state$fn <- func
     job_state$args <- args
     job_state$retries <- 0L
     job_state$done <- FALSE

@@ -28,11 +28,28 @@
             # allocate an job
             data[[j]]$id <<- id
             data[[j]]$job <<- job
+            data[[j]]$since <<- Sys.time()
             active$push(j)
 
             # invariant check
             stopifnot(free$size() + active$size() == slots)
             j
+        },
+        inspect = function() {
+            # snapshot of in-flight items: id metadata and submission time,
+            # never the live job object (may hold external handles)
+            out <- list()
+            for (j in seq_len(slots)) {
+                if (!is.null(data[[j]]$job)) {
+                    id_meta <- data[[j]]$id
+                    out[[length(out) + 1L]] <- list(
+                        id = if (is.list(id_meta)) id_meta$id else id_meta,
+                        idx = if (is.list(id_meta)) id_meta$idx else NULL,
+                        since = data[[j]]$since
+                    )
+                }
+            }
+            out
         },
         poll_ready = function() {
             n_active <- slots - active$remaining()
@@ -53,6 +70,7 @@
                     # free slot
                     data[[j]]$id <<- NULL
                     data[[j]]$job <<- NULL
+                    data[[j]]$since <<- NULL
                     free$push(j)
                     return(res)
                 } else {

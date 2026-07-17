@@ -101,7 +101,8 @@ pump_run <- function(x,
         if (!is.null(deadline) && Sys.time() > deadline) {
             stop("pump_run() timeout exceeded after ", timeout, " seconds")
         }
-        v <- x$next_item()
+        x$next_item()
+        v <- x$pop_item()
         if (is.null(v)) {
             Sys.sleep(sleep_ms / 1000)
             next
@@ -183,7 +184,8 @@ pump_drain <- function(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "m
     }
 
     while (!x$done()) {
-        v <- x$next_item()
+        x$next_item()
+        v <- x$pop_item()
         if (is.null(v)) {
             Sys.sleep(sleep_ms / 1000)
             next

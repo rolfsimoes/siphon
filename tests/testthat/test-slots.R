@@ -39,6 +39,23 @@ test_that("slots rotate unresolved jobs", {
     expect_equal(sl$active(), 1)
 })
 
+test_that("slots inspect reports in-flight items without the job object", {
+    ready_job <- structure(list(val = 42), class = "pump_main_job")
+    sl <- siphon:::.pump_slots(2)
+    expect_equal(sl$inspect(), list())
+
+    sl$acquire(list(id = "a", idx = 1L), ready_job)
+    flying <- sl$inspect()
+    expect_length(flying, 1)
+    expect_equal(flying[[1]]$id, "a")
+    expect_equal(flying[[1]]$idx, 1L)
+    expect_s3_class(flying[[1]]$since, "POSIXct")
+    expect_null(flying[[1]]$job)
+
+    sl$poll_ready()
+    expect_equal(sl$inspect(), list())
+})
+
 test_that("slots invariant holds after mixed operations", {
     ready_job <- structure(list(val = 42), class = "pump_main_job")
     sl <- siphon:::.pump_slots(3)
