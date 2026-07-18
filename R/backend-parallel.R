@@ -29,6 +29,14 @@
 #'   This backend uses the unexported `sendCall()` and `recvResult()`
 #'   functions from the `parallel` package to communicate with cluster nodes.
 #'
+#'   When a stage first advances, its function and constant arguments are
+#'   installed once on every node as a per-stage runner; each job then
+#'   ships only the item data. Runner installations are recorded alongside
+#'   [parallel_setup_workers()] expressions and replayed on replacement
+#'   nodes after a worker failure. Stage functions must be self-contained
+#'   or carry their dependencies in their closure environment; objects they
+#'   reference from the global environment are not shipped.
+#'
 #' @section Fault tolerance:
 #'   The backend is fault tolerant to worker process failures: if a worker
 #'   connection fails while a job is running or while a job is being
@@ -411,39 +419,26 @@ parallel_stop <- function(backend, force = FALSE) {
 
     cl[[1L]]
 }
-.parallel_job_call <- function(fn, args) {
-    make_job <- .make_job
-    environment(make_job) <- globalenv()
-
-    wrapper <- function(make_job, fn, args) {
-        make_job(do.call(fn, args))
-    }
-    environment(wrapper) <- globalenv()
-
-    list(
-        fn = wrapper,
-        args = list(
-            make_job = make_job,
-            fn = fn,
-            args = args
-        )
-    )
-}
-.parallel_send_job <- function(backend, worker_id, fn, args) {
+# Ships one job to a node: the stage runner is already installed in the
+# node's global environment under `key` (see the register method), so the
+# per-job payload is just the key, the item data, and a tiny fetch-and-run
+# shim.
+.parallel_send_job <- function(backend, worker_id, key, data) {
     state <- backend$state
     node <- state$cl[[worker_id]]
 
     send_call <- get("sendCall", envir = asNamespace("parallel"))
-    call <- .parallel_job_call(fn, args)
+    exec <- function(key, data) get(key, envir = globalenv())(data)
+    environment(exec) <- globalenv()
     send_call(
         node,
-        fun = call$fn,
-        args = call$args
+        fun = exec,
+        args = list(key = key, data = data)
     )
 
     invisible(NULL)
 }
-.parallel_submit_job <- function(backend, fn, args) {
+.parallel_submit_job <- function(backend, key, data) {
     state <- backend$state
     if (!length(state$cl)) {
         stop("The parallel backend has been stopped.", call. = FALSE)
@@ -465,8 +460,8 @@ parallel_stop <- function(backend, force = FALSE) {
             .parallel_send_job(
                 backend = backend,
                 worker_id = worker_id,
-                fn = fn,
-                args = args
+                key = key,
+                data = data
             )
             list(ok = TRUE)
         },
@@ -490,8 +485,8 @@ parallel_stop <- function(backend, force = FALSE) {
         sent <- .parallel_recover_and_send(
             backend = backend,
             worker_id = worker_id,
-            fn = fn,
-            args = args
+            key = key,
+            data = data
         )
     }
 
@@ -505,9 +500,11 @@ parallel_stop <- function(backend, force = FALSE) {
 
     worker_id
 }
-# Replaces the node and resends a job in one step. Returns list(ok = TRUE)
-# on success or list(ok = FALSE, cause = <condition>) on failure.
-.parallel_recover_and_send <- function(backend, worker_id, fn, args) {
+# Replaces the node and resends a job in one step. Node replacement replays
+# setup_exprs, which reinstalls every registered stage runner, so the
+# resent key still resolves. Returns list(ok = TRUE) on success or
+# list(ok = FALSE, cause = <condition>) on failure.
+.parallel_recover_and_send <- function(backend, worker_id, key, data) {
     tryCatch(
         {
             .parallel_recover_worker(
@@ -517,8 +514,8 @@ parallel_stop <- function(backend, force = FALSE) {
             .parallel_send_job(
                 backend = backend,
                 worker_id = worker_id,
-                fn = fn,
-                args = args
+                key = key,
+                data = data
             )
             list(ok = TRUE)
         },
@@ -565,8 +562,8 @@ parallel_stop <- function(backend, force = FALSE) {
         sent <- .parallel_recover_and_send(
             backend = job_state$backend,
             worker_id = worker_id,
-            fn = job_state$fn,
-            args = job_state$args
+            key = job_state$key,
+            data = job_state$data
         )
 
         # a successful resend follows the 'is_ready' contract: not ready yet
@@ -621,18 +618,48 @@ parallel_stop <- function(backend, force = FALSE) {
     length(backend$state$cl)
 }
 #' @export
-.pump_executor_new_job.pump_parallel_backend <- function(backend, func, args) {
+.pump_executor_register.pump_parallel_backend <- function(backend,
+                                                          func,
+                                                          args) {
+    state <- backend$state
+    if (!length(state$cl)) {
+        stop("The parallel backend has been stopped.", call. = FALSE)
+    }
+
+    key <- .pump_stage_key()
+    make_job <- .make_job
+    environment(make_job) <- globalenv()
+
+    runner_env <- new.env(parent = globalenv())
+    runner_env$func <- func
+    runner_env$args <- args
+    runner_env$make_job <- make_job
+    runner <- function(data) make_job(do.call(func, c(list(data), args)))
+    environment(runner) <- runner_env
+
+    # Installed once per node and recorded in setup_exprs so replacement
+    # nodes created after a worker failure replay it.
+    install_expr <- bquote(assign(.(key), .(runner), envir = globalenv()))
+    .parallel_setup_cluster(state$cl, list(install_expr))
+    state$setup_exprs[[length(state$setup_exprs) + 1L]] <- install_expr
+
+    list(key = key)
+}
+#' @export
+.pump_executor_new_job.pump_parallel_backend <- function(backend,
+                                                         handle,
+                                                         data) {
     worker_id <- .parallel_submit_job(
         backend = backend,
-        fn = func,
-        args = args
+        key = handle$key,
+        data = data
     )
 
     job_state <- new.env(parent = emptyenv())
     job_state$backend <- backend
     job_state$worker_id <- worker_id
-    job_state$fn <- func
-    job_state$args <- args
+    job_state$key <- handle$key
+    job_state$data <- data
     job_state$retries <- 0L
     job_state$done <- FALSE
     job_state$result <- NULL
