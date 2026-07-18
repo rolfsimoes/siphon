@@ -27,8 +27,9 @@ or \code{"future"}. Use \code{parallel_backend()} directly for fault-tolerant
 PSOCK execution (no string alias). If \code{NULL} (the default), the stage
 inherits the backend set by \code{pump_run()} or \code{pump_drain()}.}
 
-\item{max_workers}{Maximum number of active jobs for this stage. Defaults to the
-backend worker count. Ignored for the synchronous \code{main_backend()} (which always uses 1).}
+\item{max_workers}{Maximum number of active jobs for this stage. Defaults to
+the backend worker count. Ignored for the synchronous \code{main_backend()}
+(which always uses 1).}
 
 \item{on_error}{How to handle item errors: \code{"stop"} throws on first error,
 \code{"collect"} propagates them, \code{"continue"} drops failed items. If \code{NULL}

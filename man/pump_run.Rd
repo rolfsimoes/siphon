@@ -38,15 +38,16 @@ A list of results in input order. Items dropped by a \code{"continue"}
 stage are omitted entirely; the result may be shorter than the input.
 }
 \description{
-\code{pump_run()} drains a siphon pipeline until all upstream sources, active slots, and
-output buffers are complete. Results are collected in the original input
-order using internal sequential indices (\code{idx}).
+\code{pump_run()} drains a siphon pipeline until all upstream sources, active
+slots, and output buffers are complete. Results are collected in the
+original input order using internal sequential indices (\code{idx}).
 }
 \details{
 The timeout parameter is checked cooperatively between polling
 iterations on the main R thread. Because of this, it only works when using
-asynchronous backends (such as \code{mirai_backend()}, \code{future_backend()} with
-a parallel plan, or \code{parallel_backend()}) that return control to the main loop. If using a
+asynchronous backends (such as \code{mirai_backend()}, \code{future_backend()}
+with a parallel plan, or \code{parallel_backend()}) that return control to
+the main loop. If using a
 synchronous backend (like \code{main_backend()}), a job stuck in an infinite
 loop or blocking operation will freeze the thread and prevent the timeout
 from being checked. Furthermore, the timeout cannot interrupt blocking
@@ -54,7 +55,8 @@ C/C++ code within background workers.
 
 The \code{sleep_ms} parameter introduces backoff time between polls when no item
 is ready. This is necessary for CPU efficiency but adds overhead. For fast
-operations (e.g., simple arithmetic), this overhead can dominate total runtime.
+operations (e.g., simple arithmetic), this overhead can dominate total
+runtime.
 siphon is designed for pipelines with substantial work per item (e.g., I/O,
 complex computations, external API calls) \strong{where coordination overhead is
 negligible compared to actual work time}.

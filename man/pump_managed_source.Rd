@@ -23,11 +23,14 @@ pump_managed_source(
 
 \item{data_fn}{Function that extracts serializable data for the pipeline.}
 
-\item{commit_fn}{Function called when the item is accepted by the terminal runner.}
+\item{commit_fn}{Function called when the item is accepted by the
+terminal runner.}
 
-\item{abort_fn}{Function called when the item leaves the runtime before acceptance.}
+\item{abort_fn}{Function called when the item leaves the runtime
+before acceptance.}
 
-\item{release_fn}{Optional function called when item-level tracking is released.}
+\item{release_fn}{Optional function called when item-level
+tracking is released.}
 
 \item{done_fn}{Optional source-level done function.}
 
