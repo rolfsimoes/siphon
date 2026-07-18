@@ -88,11 +88,11 @@
 .pump_backend_open.pump_backend <- function(backend) {
     invisible(backend)
 }
-.pump_backend_close <- function(backend) {
+.pump_backend_close <- function(backend, ...) {
     UseMethod(".pump_backend_close")
 }
 #' @export
-.pump_backend_close.pump_backend <- function(backend) {
+.pump_backend_close.pump_backend <- function(backend, ...) {
     invisible(backend)
 }
 
@@ -130,5 +130,8 @@
 print.pump_backend <- function(x, ...) {
     cat("<pump_", x$name, "_backend>\n", sep = "")
     cat("  workers: ", .pump_executor_count(x), "\n", sep = "")
+    if (!is.null(x$note)) {
+        cat("  ", x$note, "\n", sep = "")
+    }
     invisible(x)
 }
