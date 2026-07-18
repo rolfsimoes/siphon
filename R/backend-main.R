@@ -21,8 +21,12 @@ main_backend <- function() {
     1L
 }
 #' @export
-.pump_executor_new_job.pump_main_backend <- function(backend, func, args) {
-    result <- .make_job(do.call(func, args))
+.pump_executor_register.pump_main_backend <- function(backend, func, args) {
+    list(func = func, args = args)
+}
+#' @export
+.pump_executor_new_job.pump_main_backend <- function(backend, handle, data) {
+    result <- .make_job(do.call(handle$func, c(list(data), handle$args)))
     structure(list(result = result), class = "pump_main_job")
 }
 #' @export
