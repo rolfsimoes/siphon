@@ -7,6 +7,15 @@
 #'   the mirai daemon lifecycle. Call `mirai::daemons(n)` to start workers and
 #'   `mirai::daemons(0)` to shut them down. See the vignette for examples.
 #'
+#'   When a stage first advances, its function and constant arguments are
+#'   installed once on every connected daemon (via `mirai::everywhere()`);
+#'   each job then ships only the item data. The daemon pool is therefore
+#'   assumed to be static for the duration of a run: a daemon that connects
+#'   after the stage registered does not have the stage payload and will
+#'   fail jobs routed to it. Stage functions must be self-contained or
+#'   carry their dependencies in their closure environment; objects they
+#'   reference from the global environment are not shipped.
+#'
 #'   Fault tolerance is delegated to the `mirai` framework: this backend
 #'   performs no retries. If a daemon dies while running a job, the
 #'   resulting `errorValue` is surfaced as a `pump_error` value for that
@@ -36,10 +45,41 @@ mirai_backend <- function() {
     mirai::status()$connections
 }
 #' @export
-.pump_executor_new_job.pump_mirai_backend <- function(backend, func, args) {
+.pump_executor_register.pump_mirai_backend <- function(backend, func, args) {
+    key <- .pump_stage_key()
+    make_job <- .make_job
+    environment(make_job) <- globalenv()
+    # Install a per-stage runner in every connected daemon's global
+    # environment; jobs reference it by key so only the item data travels
+    # per job. Daemons connecting later lack the runner (static-pool
+    # assumption, see ?mirai_backend).
+    # nolint start: object_usage_linter. The expression is quoted by
+    # everywhere() and evaluated daemon-side with bindings from .args.
+    installed <- mirai::everywhere(
+        assign(key,
+            function(data) make_job(do.call(func, c(list(data), args))),
+            envir = globalenv()
+        ),
+        .args = list(key = key, func = func, args = args, make_job = make_job)
+    )
+    # nolint end
+    res <- installed[]
+    failed <- vapply(res, mirai::is_error_value, logical(1))
+    if (any(failed)) {
+        stop(
+            "Failed to register the stage on ", sum(failed),
+            " mirai daemon(s).",
+            call. = FALSE
+        )
+    }
+    list(key = key)
+}
+#' @export
+.pump_executor_new_job.pump_mirai_backend <- function(backend, handle, data) {
+    key <- handle$key
     m <- mirai::mirai(
-        .make_job(do.call(func, args)),
-        .args = list(.make_job = .make_job, func = func, args = args)
+        get(key, envir = globalenv())(data),
+        .args = list(key = key, data = data)
     )
     structure(list(result = m), class = "pump_mirai_job")
 }
