@@ -1,8 +1,8 @@
 #' Run a siphon pipeline and collect results
 #'
-#' `pump_run()` drains a siphon pipeline until all upstream sources, active slots, and
-#' output buffers are complete. Results are collected in the original input
-#' order using internal sequential indices (`idx`).
+#' `pump_run()` drains a siphon pipeline until all upstream sources, active
+#'   slots, and output buffers are complete. Results are collected in the
+#'   original input order using internal sequential indices (`idx`).
 #'
 #' @param x A pump object or a finite R object.
 #' @param sleep_ms Delay between polls when no item is ready.
@@ -20,8 +20,9 @@
 #'
 #' @details The timeout parameter is checked cooperatively between polling
 #'   iterations on the main R thread. Because of this, it only works when using
-#'   asynchronous backends (such as `mirai_backend()`, `future_backend()` with
-#'   a parallel plan, or `parallel_backend()`) that return control to the main loop. If using a
+#'   asynchronous backends (such as `mirai_backend()`, `future_backend()`
+#'   with a parallel plan, or `parallel_backend()`) that return control to
+#'   the main loop. If using a
 #'   synchronous backend (like `main_backend()`), a job stuck in an infinite
 #'   loop or blocking operation will freeze the thread and prevent the timeout
 #'   from being checked. Furthermore, the timeout cannot interrupt blocking
@@ -29,7 +30,8 @@
 #'
 #'   The `sleep_ms` parameter introduces backoff time between polls when no item
 #'   is ready. This is necessary for CPU efficiency but adds overhead. For fast
-#'   operations (e.g., simple arithmetic), this overhead can dominate total runtime.
+#'   operations (e.g., simple arithmetic), this overhead can dominate total
+#'   runtime.
 #'   siphon is designed for pipelines with substantial work per item (e.g., I/O,
 #'   complex computations, external API calls) **where coordination overhead is
 #'   negligible compared to actual work time**.
@@ -45,11 +47,11 @@
 #' pump_run(f, timeout = 10)
 #' @export
 pump_run <- function(x,
-                      sleep_ms = 10,
-                      verbose = TRUE,
-                      on_error = "stop",
-                      backend = "main",
-                      timeout = NULL) {
+                     sleep_ms = 10,
+                     verbose = TRUE,
+                     on_error = "stop",
+                     backend = "main",
+                     timeout = NULL) {
     if (!inherits(x, "pump")) x <- .pump_source_basic(x)
     on.exit(if (is.function(x$close)) x$close(), add = TRUE)
 
@@ -68,12 +70,14 @@ pump_run <- function(x,
     # effective policy (explicit stage policy wins over this default).
     if (is.function(x$set_on_error)) x$set_on_error(on_error)
 
-    # Set the global default backend on the pipeline so each stage can resolve its
-    # effective backend (explicit stage backend wins over this default).
+    # Set the global default backend on the pipeline so each stage can
+    # resolve its effective backend (explicit stage backend wins over this
+    # default).
     if (is.function(x$set_backend)) x$set_backend(backend)
 
     progress <- verbose
-    if (is.infinite(x$pipeline_length()) || x$pipeline_length() / .pump_executor_count(x$backend()) < 2L) {
+    if (is.infinite(x$pipeline_length()) ||
+            x$pipeline_length() / .pump_executor_count(x$backend()) < 2L) {
         progress <- FALSE
     }
     if (progress) {
@@ -87,7 +91,7 @@ pump_run <- function(x,
     } else {
         NULL
     }
-    
+
     n_size <- length(x)
     if (is.finite(n_size)) {
         vals <- vector("list", n_size)
@@ -165,17 +169,23 @@ pump_run <- function(x,
 #' })
 #' print(results)
 #' @export
-pump_drain <- function(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main") {
+pump_drain <- function(x,
+                       handle_fn,
+                       sleep_ms = 10,
+                       verbose = TRUE,
+                       backend = "main") {
     if (!inherits(x, "pump")) x <- .pump_source_basic(x)
     if (!is.function(handle_fn)) stop("handle_fn must be a function")
     on.exit(if (is.function(x$close)) x$close(), add = TRUE)
 
-    # Set the global default backend on the pipeline so each stage can resolve its
-    # effective backend (explicit stage backend wins over this default).
+    # Set the global default backend on the pipeline so each stage can
+    # resolve its effective backend (explicit stage backend wins over this
+    # default).
     if (is.function(x$set_backend)) x$set_backend(backend)
 
     progress <- verbose
-    if (is.infinite(x$pipeline_length()) || x$pipeline_length() / .pump_executor_count(x$backend()) < 2L) {
+    if (is.infinite(x$pipeline_length()) ||
+            x$pipeline_length() / .pump_executor_count(x$backend()) < 2L) {
         progress <- FALSE
     }
     if (progress) {

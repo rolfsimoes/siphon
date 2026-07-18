@@ -293,10 +293,10 @@ parallel_stop <- function(backend, force = FALSE) {
 .parallel_expr_inject <- function(expr, env) {
     if (is.call(expr)) {
         if (identical(expr[[1L]], as.name("{")) &&
-            length(expr) == 2L &&
-            is.call(expr[[2L]]) &&
-            identical(expr[[2L]][[1L]], as.name("{")) &&
-            length(expr[[2L]]) == 2L) {
+                length(expr) == 2L &&
+                is.call(expr[[2L]]) &&
+                identical(expr[[2L]][[1L]], as.name("{")) &&
+                length(expr[[2L]]) == 2L) {
             return(eval(expr[[2L]][[2L]], envir = env))
         }
 

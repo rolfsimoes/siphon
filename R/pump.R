@@ -158,10 +158,17 @@
 }
 
 # Internal constructor for empty stage objects
-.pump_empty_stage <- function(upstream, backend, explicit_on_error, explicit_backend = NULL) {
+.pump_empty_stage <- function(upstream,
+                              backend,
+                              explicit_on_error,
+                              explicit_backend = NULL) {
     stats <- .pump_stats()
-    error_policy <- .pump_error_policy(explicit = explicit_on_error, upstream = upstream)
-    backend_policy <- .pump_backend_policy(explicit = explicit_backend, upstream = upstream)
+    error_policy <- .pump_error_policy(
+        explicit = explicit_on_error, upstream = upstream
+    )
+    backend_policy <- .pump_backend_policy(
+        explicit = explicit_backend, upstream = upstream
+    )
 
     structure(list(
         next_item = function() invisible("done"),
@@ -208,12 +215,21 @@
     n <- upstream$length()
     i <- 0L
     stats <- .pump_stats()
-    error_policy <- .pump_error_policy(explicit = explicit_on_error, upstream = upstream)
-    backend_policy <- .pump_backend_policy(explicit = explicit_backend, upstream = upstream)
-    
+    error_policy <- .pump_error_policy(
+        explicit = explicit_on_error, upstream = upstream
+    )
+    backend_policy <- .pump_backend_policy(
+        explicit = explicit_backend, upstream = upstream
+    )
+
     # Handle empty upstreams
     if (is.finite(n) && n == 0L) {
-        return(.pump_empty_stage(upstream = upstream, backend = backend, explicit_on_error = explicit_on_error, explicit_backend = explicit_backend))
+        return(.pump_empty_stage(
+            upstream = upstream,
+            backend = backend,
+            explicit_on_error = explicit_on_error,
+            explicit_backend = explicit_backend
+        ))
     }
     buf <- .pump_queue(buffer_size)
     sl <- .pump_slots(max_workers)
@@ -262,7 +278,11 @@
         if (!is.list(res$id)) {
             stop("Internal error: item ID metadata is invalid")
         }
-        .pump_make_msg(id = res$id$id, idx = res$id$idx, data = job_result$value)
+        .pump_make_msg(
+            id = res$id$id,
+            idx = res$id$idx,
+            data = job_result$value
+        )
     }
 
     # move completed jobs from slots into the output buffer
@@ -382,7 +402,9 @@
         item_release = function(id) {
             upstream$item_release(id)
         },
-        done = function() upstream$done() && buf$size() == 0L && sl$active() == 0L,
+        done = function() {
+            upstream$done() && buf$size() == 0L && sl$active() == 0L
+        },
         close = function() if (is.function(upstream$close)) upstream$close(),
         backend = function() backend,
         upstream = function() upstream
@@ -412,8 +434,9 @@
 #'   or `"future"`. Use `parallel_backend()` directly for fault-tolerant
 #'   PSOCK execution (no string alias). If `NULL` (the default), the stage
 #'   inherits the backend set by `pump_run()` or `pump_drain()`.
-#' @param max_workers Maximum number of active jobs for this stage. Defaults to the
-#'   backend worker count. Ignored for the synchronous `main_backend()` (which always uses 1).
+#' @param max_workers Maximum number of active jobs for this stage. Defaults to
+#'   the backend worker count. Ignored for the synchronous `main_backend()`
+#'   (which always uses 1).
 #' @param on_error How to handle item errors: `"stop"` throws on first error,
 #'   `"collect"` propagates them, `"continue"` drops failed items. If `NULL`
 #'   (the default), the stage inherits the policy set by `pump_run()`.
@@ -446,7 +469,8 @@ pump <- function(x,
         on_error <- match.arg(on_error, c("stop", "collect", "continue"))
     }
 
-    # Resolve backend: explicit backend parameter, or default from upstream, or "main"
+    # Resolve backend: explicit backend parameter, or default from upstream,
+    # or "main"
     if (is.null(backend)) {
         if (is.function(x$get_backend)) {
             backend <- x$get_backend()
@@ -467,7 +491,7 @@ pump <- function(x,
             stop("backend must have at least one process")
         }
     }
-    
+
     # Compute max_workers
     if (inherits(backend, "pump_main_backend")) {
         max_workers <- 1L
@@ -486,7 +510,7 @@ pump <- function(x,
             .pump_executor_count(backend), ") for backend"
         )
     }
-    
+
     # Compute buffer_size
     if (is.null(buffer_size)) {
         buffer_size <- 1000L
@@ -496,10 +520,10 @@ pump <- function(x,
     } else {
         buffer_size <- as.integer(max(1L, buffer_size))
     }
-    
+
     # Capture additional arguments
     args <- list(...)
-    
+
     # Call internal constructor
     .pump_stage(
         upstream = x,

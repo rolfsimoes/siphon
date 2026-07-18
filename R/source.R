@@ -193,7 +193,11 @@ pump_source <- function(pull_fn,
 
     # Defaults
     done_resolved <- if (is.null(done_fn)) function() FALSE else done_fn
-    close_resolved <- if (is.null(close_fn)) function() invisible(NULL) else close_fn
+    close_resolved <- if (is.null(close_fn)) {
+        function() invisible(NULL)
+    } else {
+        close_fn
+    }
     length_fn <- if (is.function(length)) length else function() length
 
     item_commit_resolved <- if (is.null(item_commit_fn)) {
@@ -231,9 +235,15 @@ pump_source <- function(pull_fn,
             return(NULL)
         }
         if (!is.list(msg) || !all(c("id", "data", "ok") %in% names(msg))) {
-            stop("pull_fn must return NULL or a list with 'id', 'data', and 'ok' elements")
+            stop(
+                "pull_fn must return NULL or a list with ",
+                "'id', 'data', and 'ok' elements"
+            )
         }
-        if (is.null(msg$id) || !is.atomic(msg$id) || length(msg$id) != 1L || is.na(msg$id)) {
+        if (is.null(msg$id) ||
+                !is.atomic(msg$id) ||
+                length(msg$id) != 1L ||
+                is.na(msg$id)) {
             stop("pull_fn must return items with a valid scalar atomic 'id'")
         }
         if (!is.logical(msg$ok) || length(msg$ok) != 1L || is.na(msg$ok)) {

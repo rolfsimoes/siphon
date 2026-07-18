@@ -26,7 +26,10 @@
 #' @export
 pump_step <- function(x, beats = 1L) {
     if (!inherits(x, "pump")) stop("x must be a pump object")
-    if (!is.numeric(beats) || length(beats) != 1L || is.na(beats) || beats < 1L) {
+    if (!is.numeric(beats) ||
+            length(beats) != 1L ||
+            is.na(beats) ||
+            beats < 1L) {
         stop("beats must be a positive number")
     }
     for (b in seq_len(as.integer(beats))) {

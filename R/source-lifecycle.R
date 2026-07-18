@@ -83,9 +83,12 @@ pump_item_registry <- function(parent = emptyenv()) {
 #' @param pull_fn Function that returns one source-owned item or `NULL`.
 #' @param id_fn Function that extracts the item id.
 #' @param data_fn Function that extracts serializable data for the pipeline.
-#' @param commit_fn Function called when the item is accepted by the terminal runner.
-#' @param abort_fn Function called when the item leaves the runtime before acceptance.
-#' @param release_fn Optional function called when item-level tracking is released.
+#' @param commit_fn Function called when the item is accepted by the
+#'   terminal runner.
+#' @param abort_fn Function called when the item leaves the runtime
+#'   before acceptance.
+#' @param release_fn Optional function called when item-level
+#'   tracking is released.
 #' @param done_fn Optional source-level done function.
 #' @param close_fn Optional source-level close function.
 #' @param length Source length or function returning source length.

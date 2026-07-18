@@ -29,5 +29,8 @@
         class(e) <- c("pump_error", class(e))
         e
     })
-    list(value = val, fn_time = as.numeric(difftime(Sys.time(), start, units = "secs")) * 1000)
+    list(
+        value = val,
+        fn_time = as.numeric(difftime(Sys.time(), start, units = "secs")) * 1000
+    )
 }
