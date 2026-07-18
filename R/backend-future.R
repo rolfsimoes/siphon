@@ -7,6 +7,13 @@
 #'   the future plan lifecycle. Call `future::plan()` to set a plan and restore
 #'   the previous plan when done. See the vignette for examples.
 #'
+#'   Globals required by the stage function are detected automatically by
+#'   the `future` framework, exactly as in a plain `future::future()` call.
+#'   Because plans provide no persistent worker state, the function and its
+#'   detected globals travel with every job; for stages with large captured
+#'   state, prefer [mirai_backend()] or [parallel_backend()], which install
+#'   the stage payload on each worker once.
+#'
 #'   Fault tolerance is delegated to the `future` framework: this backend
 #'   performs no retries. If a worker dies while running a job, the
 #'   resulting `FutureError` is surfaced as a `pump_error` value for that
@@ -37,11 +44,19 @@ future_backend <- function() {
     future::nbrOfWorkers()
 }
 #' @export
-.pump_executor_new_job.pump_future_backend <- function(backend, func, args) {
+.pump_executor_register.pump_future_backend <- function(backend, func, args) {
+    list(func = func, args = args)
+}
+#' @export
+.pump_executor_new_job.pump_future_backend <- function(backend, handle, data) {
+    # No explicit globals: naming them would disable future's automatic
+    # detection, which is what ships the globals that job_fn itself uses.
     make_job <- .make_job
+    environment(make_job) <- globalenv()
+    job_fn <- handle$func
+    job_args <- c(list(data), handle$args)
     f <- future::future(
-        make_job(do.call(func, args)),
-        globals = list(make_job = make_job, func = func, args = args)
+        make_job(do.call(job_fn, job_args))
     )
     structure(list(result = f), class = "pump_future_job")
 }
