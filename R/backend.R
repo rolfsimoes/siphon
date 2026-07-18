@@ -60,7 +60,15 @@
 .pump_executor_count <- function(backend) {
     UseMethod(".pump_executor_count")
 }
-.pump_executor_new_job <- function(backend, func, args) {
+# Called once per stage after the backend is open: installs the stage's
+# static payload (func and constant args) wherever the backend can keep it
+# and returns an opaque handle for .pump_executor_new_job(). Backends with
+# persistent workers ship the payload once here so per-job traffic is only
+# the item data.
+.pump_executor_register <- function(backend, func, args) {
+    UseMethod(".pump_executor_register")
+}
+.pump_executor_new_job <- function(backend, handle, data) {
     UseMethod(".pump_executor_new_job")
 }
 .pump_job_is_ready <- function(job) {
