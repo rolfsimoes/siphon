@@ -6,6 +6,16 @@
     proc.time()[["elapsed"]] * 1000
 }
 
+# Per-session counter for stage registration keys, pid-qualified so two R
+# sessions sharing one daemon pool cannot collide.
+.pump_state <- new.env(parent = emptyenv())
+
+.pump_stage_key <- function() {
+    n <- (.pump_state$stage_counter %||% 0L) + 1L
+    .pump_state$stage_counter <- n
+    sprintf(".siphon_stage_%d_%d", Sys.getpid(), n)
+}
+
 # Human-readable backend name for status and print output
 .pump_backend_name <- function(backend) {
     backend$name %||% "unknown"
