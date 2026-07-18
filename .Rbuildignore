@@ -1,5 +1,6 @@
 ^doc$
 ^Meta$
+^\.lintr$
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^plan$
