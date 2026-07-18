@@ -41,7 +41,8 @@ test_that("worker crash triggers a retry that succeeds on a fresh node", {
     on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
     flag <- tempfile()
-    job <- siphon:::.pump_executor_new_job(bk, crash_once_fn, list(flag))
+    h <- siphon:::.pump_executor_register(bk, crash_once_fn, list())
+    job <- siphon:::.pump_executor_new_job(bk, h, flag)
 
     expect_true(wait_until_ready(job))
     result <- siphon:::.pump_job_data(job)
@@ -57,7 +58,8 @@ test_that("exhausted retries produce a pump_error and a recovered node", {
     bk <- parallel_backend(1, retries = 1L, retry_sleep = 0)
     on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
-    job <- siphon:::.pump_executor_new_job(bk, crash_always_fn, list(1))
+    h <- siphon:::.pump_executor_register(bk, crash_always_fn, list())
+    job <- siphon:::.pump_executor_new_job(bk, h, 1)
 
     expect_true(wait_until_ready(job))
     result <- siphon:::.pump_job_data(job)
@@ -69,7 +71,8 @@ test_that("exhausted retries produce a pump_error and a recovered node", {
     expect_false(any(bk$state$busy))
 
     # the replacement node must be fully usable afterwards
-    job2 <- siphon:::.pump_executor_new_job(bk, function(x) x + 1, list(1))
+    h2 <- siphon:::.pump_executor_register(bk, function(x) x + 1, list())
+    job2 <- siphon:::.pump_executor_new_job(bk, h2, 1)
     expect_true(wait_until_ready(job2))
     expect_equal(siphon:::.pump_job_data(job2)$value, 2)
 })
@@ -95,7 +98,8 @@ test_that("setup expressions are replayed on replacement nodes", {
     environment(crash_then_read) <- globalenv()
 
     flag <- tempfile()
-    job <- siphon:::.pump_executor_new_job(bk, crash_then_read, list(flag))
+    h <- siphon:::.pump_executor_register(bk, crash_then_read, list())
+    job <- siphon:::.pump_executor_new_job(bk, h, flag)
 
     expect_true(wait_until_ready(job))
     expect_equal(siphon:::.pump_job_data(job)$value, 42)
@@ -109,10 +113,13 @@ test_that("submission recovers a worker that died while idle", {
     bk <- parallel_backend(1, retries = 3)
     on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
-    # learn the worker pid, then kill the worker while it is idle
+    # learn the worker pid, then kill the worker while it is idle;
+    # both runners are registered while the worker is still alive
     pid_fn <- function(x) Sys.getpid()
     environment(pid_fn) <- globalenv()
-    job <- siphon:::.pump_executor_new_job(bk, pid_fn, list(1))
+    h_pid <- siphon:::.pump_executor_register(bk, pid_fn, list())
+    h_inc <- siphon:::.pump_executor_register(bk, function(x) x + 1, list())
+    job <- siphon:::.pump_executor_new_job(bk, h_pid, 1)
     expect_true(wait_until_ready(job))
     pid <- siphon:::.pump_job_data(job)$value
     tools::pskill(pid)
@@ -120,7 +127,7 @@ test_that("submission recovers a worker that died while idle", {
 
     # the next submission must transparently replace the dead node, either
     # at dispatch time (send failure) or at receive time (poll failure)
-    job2 <- siphon:::.pump_executor_new_job(bk, function(x) x + 1, list(1))
+    job2 <- siphon:::.pump_executor_new_job(bk, h_inc, 1)
     expect_true(wait_until_ready(job2))
     expect_equal(siphon:::.pump_job_data(job2)$value, 2)
     expect_false(any(bk$state$busy))

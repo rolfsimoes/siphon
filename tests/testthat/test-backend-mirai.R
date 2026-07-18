@@ -8,7 +8,8 @@ test_that("mirai_backend operations work with local daemons", {
 
     # 1. mirai_backend jobs execute and return values
     bk <- mirai_backend()
-    job <- siphon:::.pump_executor_new_job(bk, function(x) x^2, list(5))
+    h <- siphon:::.pump_executor_register(bk, function(x) x^2, list())
+    job <- siphon:::.pump_executor_new_job(bk, h, 5)
     expect_true(siphon:::.pump_job_is_ready(job) || {
         for (i in 1:50) {
             Sys.sleep(0.1)
@@ -87,14 +88,15 @@ test_that("mirai_backend surfaces daemon death as a pump_error", {
 
     # adapter level
     bk <- mirai_backend()
-    job <- siphon:::.pump_executor_new_job(
+    h <- siphon:::.pump_executor_register(
         bk,
         function(x) {
             tools::pskill(Sys.getpid())
             Sys.sleep(30)
         },
-        list(1)
+        list()
     )
+    job <- siphon:::.pump_executor_new_job(bk, h, 1)
     for (i in 1:100) {
         if (siphon:::.pump_job_is_ready(job)) break
         Sys.sleep(0.1)

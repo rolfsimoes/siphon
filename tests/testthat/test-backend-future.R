@@ -5,7 +5,8 @@ test_that("future_backend jobs execute under sequential plan", {
     on.exit(future::plan(old_plan), add = TRUE)
 
     bk <- future_backend()
-    job <- siphon:::.pump_executor_new_job(bk, function(x) x^2, list(6))
+    h <- siphon:::.pump_executor_register(bk, function(x) x^2, list())
+    job <- siphon:::.pump_executor_new_job(bk, h, 6)
     expect_true(siphon:::.pump_job_is_ready(job))
     result <- siphon:::.pump_job_data(job)
     expect_equal(result$value, 36)
@@ -18,7 +19,8 @@ test_that("future_backend jobs execute under multisession plan", {
     on.exit(future::plan(old_plan), add = TRUE)
 
     bk <- future_backend()
-    job <- siphon:::.pump_executor_new_job(bk, function(x) x + 1, list(9))
+    h <- siphon:::.pump_executor_register(bk, function(x) x + 1, list())
+    job <- siphon:::.pump_executor_new_job(bk, h, 9)
     for (i in 1:50) {
         Sys.sleep(0.1)
         if (siphon:::.pump_job_is_ready(job)) break
@@ -138,14 +140,15 @@ test_that("future_backend surfaces worker death as a pump_error", {
 
     # adapter level
     bk <- future_backend()
-    job <- siphon:::.pump_executor_new_job(
+    h <- siphon:::.pump_executor_register(
         bk,
         function(x) {
             tools::pskill(Sys.getpid())
             Sys.sleep(30)
         },
-        list(1)
+        list()
     )
+    job <- siphon:::.pump_executor_new_job(bk, h, 1)
     for (i in 1:100) {
         if (siphon:::.pump_job_is_ready(job)) break
         Sys.sleep(0.1)

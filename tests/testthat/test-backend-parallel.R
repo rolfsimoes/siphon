@@ -43,21 +43,34 @@ test_that(".parallel_expr_inject leaves non-injection expressions unchanged", {
     expect_equal(siphon:::.parallel_expr_inject(5, env), 5)
 })
 
-test_that(".parallel_job_call builds a globalenv-scoped wrapper", {
-    fn <- function(x) x + 1
-    call <- siphon:::.parallel_job_call(fn, list(1))
+test_that("register installs a per-stage runner shipped once", {
+    skip_if_not_installed("parallel")
+    bk <- parallel_backend(2)
+    on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
-    expect_named(call, c("fn", "args"))
-    expect_named(call$args, c("make_job", "fn", "args"))
+    n_setup <- length(bk$state$setup_exprs)
+    h <- siphon:::.pump_executor_register(bk, function(x) x + 1, list())
+    expect_true(is.character(h$key) && nzchar(h$key))
 
-    # serialization-safety invariant: no lexical scope is dragged along
-    expect_identical(environment(call$fn), globalenv())
-    expect_identical(environment(call$args$make_job), globalenv())
+    # recorded for replay on replacement nodes
+    expect_length(bk$state$setup_exprs, n_setup + 1L)
 
-    # the wrapper reproduces the job protocol locally
-    result <- do.call(call$fn, call$args)
-    expect_equal(result$value, 2)
-    expect_gte(result$fn_time, 0)
+    # the runner is present in every worker's global environment
+    installed <- parallel_eval_workers(
+        bk, exists({{ h$key }}, envir = globalenv())
+    )
+    expect_true(all(unlist(installed)))
+
+    # jobs reference the runner by key and carry only the item data
+    job <- siphon:::.pump_executor_new_job(bk, h, 41)
+    expect_identical(job$state$key, h$key)
+    expect_identical(job$state$data, 41)
+    expect_null(job$state$fn)
+    for (i in 1:50) {
+        if (siphon:::.pump_job_is_ready(job)) break
+        Sys.sleep(0.1)
+    }
+    expect_equal(siphon:::.pump_job_data(job)$value, 42)
 })
 
 test_that(".parallel_worker_spec resolves numeric and hostname specs", {
@@ -126,7 +139,8 @@ test_that("parallel_backend single job round-trip", {
     bk <- parallel_backend(2)
     on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
-    job <- siphon:::.pump_executor_new_job(bk, function(x) x^2, list(6))
+    h <- siphon:::.pump_executor_register(bk, function(x) x^2, list())
+    job <- siphon:::.pump_executor_new_job(bk, h, 6)
     for (i in 1:50) {
         if (siphon:::.pump_job_is_ready(job)) break
         Sys.sleep(0.1)
@@ -150,8 +164,9 @@ test_that("parallel_backend frees node after job completes", {
     bk <- parallel_backend(2)
     on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
-    job1 <- siphon:::.pump_executor_new_job(bk, function(x) x + 1, list(1))
-    job2 <- siphon:::.pump_executor_new_job(bk, function(x) x + 1, list(2))
+    h <- siphon:::.pump_executor_register(bk, function(x) x + 1, list())
+    job1 <- siphon:::.pump_executor_new_job(bk, h, 1)
+    job2 <- siphon:::.pump_executor_new_job(bk, h, 2)
     expect_equal(sum(bk$state$busy), 2L)
     for (i in 1:50) {
         r1 <- siphon:::.pump_job_is_ready(job1)
@@ -399,6 +414,7 @@ test_that("parallel_setup_workers broadcasts while preserving expression order",
 test_that("parallel_stop stops the cluster and validates input", {
     skip_if_not_installed("parallel")
     bk <- parallel_backend(2)
+    h <- siphon:::.pump_executor_register(bk, identity, list())
 
     expect_error(parallel_stop(list()), "backend must be a parallel backend")
 
@@ -409,7 +425,11 @@ test_that("parallel_stop stops the cluster and validates input", {
     expect_invisible(parallel_stop(bk))
 
     expect_error(
-        siphon:::.pump_executor_new_job(bk, identity, list(1)),
+        siphon:::.pump_executor_new_job(bk, h, 1),
+        "has been stopped"
+    )
+    expect_error(
+        siphon:::.pump_executor_register(bk, identity, list()),
         "has been stopped"
     )
 })
