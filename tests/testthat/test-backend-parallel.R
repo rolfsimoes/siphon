@@ -1,13 +1,22 @@
 # --- Unit tests (no cluster) ---
 
 # Builds a backend-shaped object without spawning workers, to exercise
-# guard-rail branches in isolation.
-fake_parallel_backend <- function(cl, busy, workers = NULL) {
+# guard-rail branches in isolation. A NULL cl defaults to the stopped
+# state, matching what parallel_stop() leaves behind.
+fake_parallel_backend <- function(cl,
+                                  busy,
+                                  workers = NULL,
+                                  stopped = is.null(cl),
+                                  owned = TRUE) {
     state <- new.env(parent = emptyenv())
     state$cl <- cl
     state$busy <- busy
     state$workers <- workers
-    structure(list(state = state), class = "pump_parallel_backend")
+    state$stopped <- stopped
+    structure(
+        list(name = "parallel", owned = owned, state = state),
+        class = c("pump_parallel_backend", "pump_backend")
+    )
 }
 
 test_that(".parallel_expr_inject substitutes {{ }} values from the caller env", {
@@ -89,7 +98,7 @@ test_that("parallel_setup_workers guards stopped and busy backends", {
     bk_stopped <- fake_parallel_backend(cl = NULL, busy = logical())
     expect_error(
         parallel_setup_workers(bk_stopped, quote(1)),
-        "has no workers"
+        "has been stopped"
     )
 
     bk_busy <- fake_parallel_backend(cl = list("n1"), busy = TRUE)
@@ -110,7 +119,7 @@ test_that("parallel_stop refuses to stop a busy backend without force", {
 test_that(".parallel_submit_job enforces the free-node invariant", {
     bk_busy <- fake_parallel_backend(cl = list("n1"), busy = TRUE)
     expect_error(
-        siphon:::.parallel_submit_job(bk_busy, identity, list(1)),
+        siphon:::.parallel_submit_job(bk_busy, key = "k", data = 1),
         "no free cluster node"
     )
 })
@@ -119,7 +128,7 @@ test_that(".parallel_submit_job enforces the free-node invariant", {
 
 test_that("parallel_backend requires a workers specification", {
     skip_if_not_installed("parallel")
-    expect_error(parallel_backend(), "argument \"workers\" is missing")
+    expect_error(parallel_backend(), "exactly one of workers or cluster")
 })
 
 test_that("parallel_backend validates retries and retry_sleep", {
@@ -260,6 +269,8 @@ test_that("parallel_setup_workers reports worker-side setup failures", {
     bk <- parallel_backend(1)
     on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
 
+    # broadcast immediately on a live cluster
+    siphon:::.pump_backend_open(bk)
     expect_error(
         parallel_setup_workers(bk, stop("boom")),
         "Failed to set up parallel worker"
@@ -293,7 +304,7 @@ test_that("parallel_eval_workers guards stopped and busy backends", {
     bk_stopped <- fake_parallel_backend(cl = NULL, busy = logical())
     expect_error(
         parallel_eval_workers(bk_stopped, quote(1)),
-        "has no workers"
+        "has been stopped"
     )
 
     bk_busy <- fake_parallel_backend(cl = list("n1"), busy = TRUE)
@@ -431,5 +442,87 @@ test_that("parallel_stop stops the cluster and validates input", {
     expect_error(
         siphon:::.pump_executor_register(bk, identity, list()),
         "has been stopped"
+    )
+})
+
+# --- Lifecycle (open/close, cluster adapter) ---
+
+test_that("parallel_backend is a lazy specification until opened", {
+    skip_if_not_installed("parallel")
+    bk <- parallel_backend(2)
+    expect_null(bk$state$cl)
+    expect_equal(siphon:::.pump_executor_count(bk), 2L)
+
+    siphon:::.pump_backend_open(bk)
+    on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
+    expect_length(bk$state$cl, 2L)
+
+    # opening again is a no-op on the same cluster
+    cl_before <- bk$state$cl
+    siphon:::.pump_backend_open(bk)
+    expect_identical(bk$state$cl, cl_before)
+})
+
+test_that("stopping a never-opened backend retires the specification", {
+    skip_if_not_installed("parallel")
+    bk <- parallel_backend(2)
+    expect_invisible(parallel_stop(bk))
+    expect_equal(siphon:::.pump_executor_count(bk), 0L)
+    expect_error(siphon:::.pump_backend_open(bk), "has been stopped")
+})
+
+test_that("setup expressions queued before open are replayed at open", {
+    skip_if_not_installed("parallel")
+    bk <- parallel_backend(2)
+    on.exit(parallel_stop(bk, force = TRUE), add = TRUE)
+
+    parallel_setup_workers(bk, assign(".queued_value", 7, envir = globalenv()))
+    expect_null(bk$state$cl) # still a specification
+
+    got <- parallel_eval_workers(bk, get(".queued_value", envir = globalenv()))
+    expect_equal(unlist(got), c(7, 7))
+})
+
+test_that("a failing queued setup expression aborts open without leaking", {
+    skip_if_not_installed("parallel")
+    bk <- parallel_backend(1)
+    parallel_setup_workers(bk, stop("bad setup"))
+    expect_error(
+        siphon:::.pump_backend_open(bk),
+        "Failed to set up parallel worker"
+    )
+    expect_null(bk$state$cl)
+})
+
+test_that("parallel_backend(cluster=) attaches without taking ownership", {
+    skip_if_not_installed("parallel")
+    cl <- parallel::makePSOCKcluster(2)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+
+    bk <- parallel_backend(cluster = cl)
+    expect_false(bk$owned)
+    expect_equal(siphon:::.pump_executor_count(bk), 2L)
+
+    out <- 1:4 |>
+        pump(function(x) x * 2, backend = bk) |>
+        pump_run(verbose = FALSE)
+    expect_equal(out, list(2, 4, 6, 8))
+
+    # refuses to stop what it does not own; generic close is a no-op
+    expect_error(parallel_stop(bk), "does not own")
+    siphon:::.pump_backend_close(bk)
+    expect_length(bk$state$cl, 2L)
+
+    # the cluster remains fully usable by its real owner
+    expect_equal(unlist(parallel::clusterEvalQ(cl, 1 + 1)), c(2, 2))
+})
+
+test_that("parallel_backend validates the workers/cluster arguments", {
+    skip_if_not_installed("parallel")
+    expect_error(parallel_backend(), "exactly one of workers or cluster")
+    expect_error(parallel_backend(0), "positive number")
+    expect_error(
+        parallel_backend(cluster = structure(list(), class = "not_a_cluster")),
+        "cluster object"
     )
 })

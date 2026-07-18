@@ -160,3 +160,30 @@ test_that("pipeline survives a mid-stream worker crash with order intact", {
     out <- pump_run(f, verbose = FALSE)
     expect_equal(out, as.list(1:10 * 2))
 })
+
+test_that("non-owned cluster failures surface as item errors, no recovery", {
+    skip_if_not_installed("parallel")
+    skip_on_cran()
+    skip_on_os("windows")
+
+    cl <- parallel::makePSOCKcluster(2)
+    on.exit(try(parallel::stopCluster(cl), silent = TRUE), add = TRUE)
+    bk <- parallel_backend(cluster = cl)
+
+    # register both runners while every node is alive: registration
+    # broadcasts to all nodes and cannot skip dead ones
+    h_inc <- siphon:::.pump_executor_register(bk, function(x) x + 1, list())
+    h_crash <- siphon:::.pump_executor_register(bk, crash_always_fn, list())
+
+    job <- siphon:::.pump_executor_new_job(bk, h_crash, 1)
+    expect_true(wait_until_ready(job))
+    result <- siphon:::.pump_job_data(job)
+    expect_s3_class(result$value, "pump_error")
+    expect_match(conditionMessage(result$value), "non-owned cluster")
+
+    # the dead node is quarantined (kept busy); the survivor still works
+    expect_true(any(bk$state$busy))
+    job2 <- siphon:::.pump_executor_new_job(bk, h_inc, 1)
+    expect_true(wait_until_ready(job2))
+    expect_equal(siphon:::.pump_job_data(job2)$value, 2)
+})
