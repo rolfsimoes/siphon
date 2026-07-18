@@ -19,7 +19,8 @@ The backend, invisibly.
 environment of every worker of a parallel backend. Use it to load
 packages, source files, or define objects that jobs need. The expression
 is recorded and replayed automatically on any replacement node created
-after a worker failure.
+after a worker failure. It may be called before the backend's cluster
+exists: the expression is queued and replayed when the backend opens.
 }
 \details{
 The expression is captured unevaluated. Values from the calling

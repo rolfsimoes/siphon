@@ -4,38 +4,61 @@
 \alias{parallel_backend}
 \title{Create a parallel (PSOCK) backend}
 \usage{
-parallel_backend(workers, ..., retries = 3L, retry_sleep = 0)
+parallel_backend(
+  workers = NULL,
+  ...,
+  retries = 3L,
+  retry_sleep = 0,
+  cluster = NULL
+)
 }
 \arguments{
 \item{workers}{The number of local worker processes to start, or a
 character vector of host names to run workers on (as accepted by
-\code{parallel::makePSOCKcluster()}).}
+\code{parallel::makePSOCKcluster()}). Mutually exclusive with \code{cluster}.}
 
 \item{...}{Additional arguments passed to
-\code{parallel::makePSOCKcluster()}.}
+\code{parallel::makePSOCKcluster()}. Only valid with \code{workers}.}
 
 \item{retries}{Number of times a job is resubmitted after a worker
 connection failure before the job is marked as failed. A non-negative
-integer.}
+integer. Ignored when \code{cluster} is supplied.}
 
 \item{retry_sleep}{Seconds to wait before each retry attempt. A
-non-negative number.}
+non-negative number. Ignored when \code{cluster} is supplied.}
+
+\item{cluster}{An existing cluster object (as returned by
+\code{parallel::makePSOCKcluster()}) to attach to instead of creating one.
+The backend does not take ownership: you remain responsible for
+stopping the cluster. Mutually exclusive with \code{workers}.}
 }
 \value{
 A backend object.
 }
 \description{
-\code{parallel_backend()} creates and manages its own PSOCK cluster and submits
-jobs to it. Jobs are dispatched with a non-blocking send and readiness is
-polled with \code{socketSelect()}, so the main process never blocks while jobs
-run on the cluster nodes.
+\code{parallel_backend()} manages a PSOCK cluster and submits jobs to it. Jobs
+are dispatched with a non-blocking send and readiness is polled with
+\code{socketSelect()}, so the main process never blocks while jobs run on the
+cluster nodes.
 }
 \details{
-The backend owns its cluster: it is created when
-\code{parallel_backend()} is called and must be shut down with
-\code{\link[=parallel_stop]{parallel_stop()}} when no longer needed. Each node runs at most one job
-at a time, so \code{max_workers} for a stage using this backend must not
-exceed the number of workers (enforced by \code{pump()}).
+With \code{workers}, the backend owns its cluster: \code{parallel_backend()}
+returns a cheap specification and the worker processes are started when
+the backend first opens (first pipeline run, \code{\link[=parallel_eval_workers]{parallel_eval_workers()}}
+call, or stage registration). Shut it down with \code{\link[=parallel_stop]{parallel_stop()}} when
+no longer needed. \code{\link[=parallel_setup_workers]{parallel_setup_workers()}} may be called before the
+cluster exists: expressions are recorded and replayed at open.
+
+With \code{cluster}, the backend attaches to an externally managed cluster
+instead (for integration with packages that run their own worker pool).
+It never creates, replaces, or stops those nodes: worker recovery is
+disabled (see the fault tolerance section), \code{retries}/\code{retry_sleep} are
+ignored, and \code{\link[=parallel_stop]{parallel_stop()}} refuses - stop the cluster yourself with
+\code{parallel::stopCluster()}.
+
+Each node runs at most one job at a time, so \code{max_workers} for a stage
+using this backend must not exceed the number of workers (enforced by
+\code{pump()}).
 
 Passing the same backend to several \code{pump()} stages shares its cluster
 between them — this is the normal way to run a multi-stage pipeline on
@@ -86,6 +109,12 @@ detection is connection-based, so a worker that stalls without dying is
 never detected and there is no job timeout) and failures of the main R
 process (there is no persistence or checkpointing; in-flight work is
 lost).
+
+On a backend created with \code{cluster}, none of the above recovery
+applies: a worker connection failure surfaces as a \code{pump_error} value
+for the affected item (subject to the \code{on_error} policy) and the dead
+node is quarantined - no further jobs are dispatched to it, so
+capacity shrinks for the rest of the run.
 }
 
 \examples{
@@ -103,6 +132,13 @@ if (requireNamespace("parallel", quietly = TRUE)) {
         pump(function(x) x + 1, backend = bk, max_workers = 1)
     pump_run(f, verbose = FALSE)
     parallel_stop(bk)
+
+    # attach to a cluster you manage yourself (no ownership taken)
+    cl <- parallel::makePSOCKcluster(2)
+    bk <- parallel_backend(cluster = cl)
+    f <- 1:5 |> pump(function(x) x + 1, backend = bk)
+    pump_run(f, verbose = FALSE)
+    parallel::stopCluster(cl)
 }
 }
 \seealso{

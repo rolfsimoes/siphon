@@ -22,7 +22,9 @@ worker processes and their socket connections.
 \details{
 By default, stopping fails if jobs are still active. Set
 \code{force = TRUE} to stop the cluster regardless. Stopping an already
-stopped backend is a no-op.
+stopped backend (or one whose cluster was never started) is a no-op.
+Stopping a backend created with \code{parallel_backend(cluster = )} is an
+error: the backend does not own that cluster.
 }
 \examples{
 if (requireNamespace("parallel", quietly = TRUE)) {
