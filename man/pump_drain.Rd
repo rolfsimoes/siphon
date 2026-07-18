@@ -4,7 +4,15 @@
 \alias{pump_drain}
 \title{Drain a siphon pipeline}
 \usage{
-pump_drain(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main")
+pump_drain(
+  x,
+  handle_fn,
+  sleep_ms = 10,
+  verbose = TRUE,
+  on_error = "stop",
+  backend = "main",
+  timeout = NULL
+)
 }
 \arguments{
 \item{x}{A pump object or a finite R object.}
@@ -16,10 +24,20 @@ called for each completed item.}
 
 \item{verbose}{If \code{TRUE}, show a text progress bar.}
 
+\item{on_error}{Default error handling policy for all stages that do not
+explicitly set their own \code{on_error}: \code{"stop"} throws on first error,
+\code{"collect"} delivers error items to \code{handle_fn} with \code{ok = FALSE},
+\code{"continue"} drops failed items. Defaults to \code{"stop"}.}
+
 \item{backend}{Default backend for all stages that do not explicitly set
 their own \code{backend}. Can be a backend object or one of \code{"main"},
 \code{"mirai"}, or \code{"future"}. Use \code{parallel_backend()} directly for
 fault-tolerant PSOCK execution (no string alias). Defaults to \code{"main"}.}
+
+\item{timeout}{Maximum time in seconds to wait for completion. If
+NULL (default), waits indefinitely. If exceeded, throws an error. See
+the Details section of \code{\link[=pump_run]{pump_run()}} for the cooperative-checking
+caveats, which apply here equally.}
 }
 \value{
 Invisible \code{NULL}.
@@ -28,6 +46,10 @@ Invisible \code{NULL}.
 \code{pump_drain()} runs the pipeline, pulling items and passing them to a
 callback function as they become ready. This is a memory-safe alternative
 to \code{pump_run()} suitable for infinite or long-running pipelines.
+}
+\details{
+Unlike \code{\link[=pump_run]{pump_run()}}, draining an already-exhausted pipeline is a silent
+no-op, so daemon-style loops can re-invoke \code{pump_drain()} harmlessly.
 }
 \examples{
 results <- list()

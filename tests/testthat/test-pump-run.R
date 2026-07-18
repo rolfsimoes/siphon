@@ -75,3 +75,45 @@ test_that("pump_drain backend default is inherited by pump stages", {
     expect_equal(results, list(2, 4, 6))
 })
 
+test_that("pump_drain on an exhausted pipeline is a silent no-op", {
+    f <- 1:2 |> pump(function(x) x, backend = "main")
+    pump_run(f, verbose = FALSE)
+    calls <- 0L
+    expect_no_error(
+        pump_drain(f, handle_fn = function(id, data, ok) calls <<- calls + 1L)
+    )
+    expect_identical(calls, 0L)
+})
+
+test_that("pump_drain honors timeout", {
+    src <- pump_source(pull_fn = function() NULL) # never ready, never done
+    f <- src |> pump(function(x) x, backend = "main")
+    expect_error(
+        pump_drain(
+            f,
+            handle_fn = function(id, data, ok) NULL,
+            sleep_ms = 1,
+            timeout = 0.2
+        ),
+        "timeout"
+    )
+})
+
+test_that("pump_drain on_error = 'collect' delivers failures to handle_fn", {
+    oks <- list()
+    f <- 1:3 |>
+        pump(function(x) if (x == 2) stop("boom") else x, backend = "main")
+    pump_drain(f, handle_fn = function(id, data, ok) {
+        oks[[id]] <<- ok
+    }, on_error = "collect")
+    expect_equal(oks, list(TRUE, FALSE, TRUE))
+})
+
+test_that("pump_drain on_error = 'stop' (default) throws on first error", {
+    f <- 1:3 |>
+        pump(function(x) if (x == 2) stop("boom") else x, backend = "main")
+    expect_error(
+        pump_drain(f, handle_fn = function(id, data, ok) NULL),
+        "boom"
+    )
+})
