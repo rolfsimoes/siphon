@@ -1,15 +1,27 @@
 #' Create a parallel (PSOCK) backend
 #'
-#' `parallel_backend()` creates and manages its own PSOCK cluster and submits
-#' jobs to it. Jobs are dispatched with a non-blocking send and readiness is
-#' polled with `socketSelect()`, so the main process never blocks while jobs
-#' run on the cluster nodes.
+#' `parallel_backend()` manages a PSOCK cluster and submits jobs to it. Jobs
+#' are dispatched with a non-blocking send and readiness is polled with
+#' `socketSelect()`, so the main process never blocks while jobs run on the
+#' cluster nodes.
 #'
-#' @details The backend owns its cluster: it is created when
-#'   `parallel_backend()` is called and must be shut down with
-#'   [parallel_stop()] when no longer needed. Each node runs at most one job
-#'   at a time, so `max_workers` for a stage using this backend must not
-#'   exceed the number of workers (enforced by `pump()`).
+#' @details With `workers`, the backend owns its cluster: `parallel_backend()`
+#'   returns a cheap specification and the worker processes are started when
+#'   the backend first opens (first pipeline run, [parallel_eval_workers()]
+#'   call, or stage registration). Shut it down with [parallel_stop()] when
+#'   no longer needed. [parallel_setup_workers()] may be called before the
+#'   cluster exists: expressions are recorded and replayed at open.
+#'
+#'   With `cluster`, the backend attaches to an externally managed cluster
+#'   instead (for integration with packages that run their own worker pool).
+#'   It never creates, replaces, or stops those nodes: worker recovery is
+#'   disabled (see the fault tolerance section), `retries`/`retry_sleep` are
+#'   ignored, and [parallel_stop()] refuses - stop the cluster yourself with
+#'   `parallel::stopCluster()`.
+#'
+#'   Each node runs at most one job at a time, so `max_workers` for a stage
+#'   using this backend must not exceed the number of workers (enforced by
+#'   `pump()`).
 #'
 #'   Passing the same backend to several `pump()` stages shares its cluster
 #'   between them — this is the normal way to run a multi-stage pipeline on
@@ -60,16 +72,26 @@
 #'   process (there is no persistence or checkpointing; in-flight work is
 #'   lost).
 #'
+#'   On a backend created with `cluster`, none of the above recovery
+#'   applies: a worker connection failure surfaces as a `pump_error` value
+#'   for the affected item (subject to the `on_error` policy) and the dead
+#'   node is quarantined - no further jobs are dispatched to it, so
+#'   capacity shrinks for the rest of the run.
+#'
 #' @param workers The number of local worker processes to start, or a
 #'   character vector of host names to run workers on (as accepted by
-#'   `parallel::makePSOCKcluster()`).
+#'   `parallel::makePSOCKcluster()`). Mutually exclusive with `cluster`.
 #' @param ... Additional arguments passed to
-#'   `parallel::makePSOCKcluster()`.
+#'   `parallel::makePSOCKcluster()`. Only valid with `workers`.
 #' @param retries Number of times a job is resubmitted after a worker
 #'   connection failure before the job is marked as failed. A non-negative
-#'   integer.
+#'   integer. Ignored when `cluster` is supplied.
 #' @param retry_sleep Seconds to wait before each retry attempt. A
-#'   non-negative number.
+#'   non-negative number. Ignored when `cluster` is supplied.
+#' @param cluster An existing cluster object (as returned by
+#'   `parallel::makePSOCKcluster()`) to attach to instead of creating one.
+#'   The backend does not take ownership: you remain responsible for
+#'   stopping the cluster. Mutually exclusive with `workers`.
 #' @return A backend object.
 #' @seealso [parallel_setup_workers()], [parallel_stop()]
 #' @examples
@@ -87,12 +109,20 @@
 #'         pump(function(x) x + 1, backend = bk, max_workers = 1)
 #'     pump_run(f, verbose = FALSE)
 #'     parallel_stop(bk)
+#'
+#'     # attach to a cluster you manage yourself (no ownership taken)
+#'     cl <- parallel::makePSOCKcluster(2)
+#'     bk <- parallel_backend(cluster = cl)
+#'     f <- 1:5 |> pump(function(x) x + 1, backend = bk)
+#'     pump_run(f, verbose = FALSE)
+#'     parallel::stopCluster(cl)
 #' }
 #' @export
-parallel_backend <- function(workers,
+parallel_backend <- function(workers = NULL,
                              ...,
                              retries = 3L,
-                             retry_sleep = 0) {
+                             retry_sleep = 0,
+                             cluster = NULL) {
     .pump_need_pkg("parallel", "parallel_backend()")
 
     retries <- as.integer(retries)
@@ -104,22 +134,135 @@ parallel_backend <- function(workers,
         stop("retry_sleep must be a non-negative number.", call. = FALSE)
     }
 
+    if (is.null(workers) == is.null(cluster)) {
+        stop("Supply exactly one of workers or cluster.", call. = FALSE)
+    }
+
     args <- list(...)
-    cl <- do.call(parallel::makePSOCKcluster, c(list(names = workers), args))
 
     state <- new.env(parent = emptyenv())
-    state$cl <- cl
-    state$workers <- workers
     state$make_args <- args
-    state$busy <- rep(FALSE, length(cl))
     state$setup_exprs <- list()
     state$retries <- retries
     state$retry_sleep <- retry_sleep
+    state$stopped <- FALSE
+
+    # Adapter mode: wrap an externally managed cluster. The backend never
+    # creates, replaces, or stops its nodes (no worker recovery).
+    if (!is.null(cluster)) {
+        if (!inherits(cluster, "cluster")) {
+            stop(
+                "cluster must be a cluster object from the parallel package.",
+                call. = FALSE
+            )
+        }
+        if (length(args)) {
+            stop(
+                "... arguments cannot be combined with cluster.",
+                call. = FALSE
+            )
+        }
+        state$cl <- cluster
+        state$workers <- length(cluster)
+        state$busy <- rep(FALSE, length(cluster))
+        return(structure(
+            list(
+                name = "parallel",
+                owned = FALSE,
+                note = "cluster: attached, not owned (no worker recovery)",
+                state = state
+            ),
+            class = c("pump_parallel_backend", "pump_backend")
+        ))
+    }
+
+    valid_count <- is.numeric(workers) && length(workers) == 1L &&
+        !is.na(workers) && workers >= 1
+    valid_hosts <- is.character(workers) && length(workers) >= 1L &&
+        !anyNA(workers)
+    if (!valid_count && !valid_hosts) {
+        stop(
+            "workers must be a positive number or a character vector ",
+            "of host names.",
+            call. = FALSE
+        )
+    }
+
+    # Owned mode is a specification: the cluster is created when the
+    # backend opens (first pipeline run or worker operation).
+    state$cl <- NULL
+    state$workers <- workers
+    state$busy <- logical()
 
     structure(
         list(name = "parallel", owned = TRUE, state = state),
         class = c("pump_parallel_backend", "pump_backend")
     )
+}
+
+#' @export
+.pump_backend_open.pump_parallel_backend <- function(backend) {
+    state <- backend$state
+    if (state$stopped) {
+        stop("The parallel backend has been stopped.", call. = FALSE)
+    }
+    if (!is.null(state$cl)) {
+        return(invisible(backend))
+    }
+
+    cl <- do.call(
+        parallel::makePSOCKcluster,
+        c(list(names = state$workers), state$make_args)
+    )
+
+    # Replay setup expressions queued before the cluster existed; do not
+    # leak worker processes if a setup expression fails.
+    if (length(state$setup_exprs)) {
+        tryCatch(
+            .parallel_setup_cluster(cl, state$setup_exprs),
+            error = function(e) {
+                try(parallel::stopCluster(cl), silent = TRUE)
+                stop(e)
+            }
+        )
+    }
+
+    state$cl <- cl
+    state$busy <- rep(FALSE, length(cl))
+    invisible(backend)
+}
+
+#' @export
+.pump_backend_close.pump_parallel_backend <- function(backend,
+                                                      force = FALSE,
+                                                      ...) {
+    state <- backend$state
+
+    # Never stop a cluster the backend does not own.
+    if (!isTRUE(backend$owned)) {
+        return(invisible(backend))
+    }
+    if (state$stopped) {
+        return(invisible(backend))
+    }
+    if (!is.null(state$cl) && !force && any(state$busy)) {
+        stop("Cannot stop a parallel backend with active jobs.", call. = FALSE)
+    }
+
+    state$stopped <- TRUE
+    if (!is.null(state$cl)) {
+        tryCatch(
+            parallel::stopCluster(state$cl),
+            finally = {
+                state$cl <- NULL
+                state$busy <- logical()
+            }
+        )
+    } else {
+        state$busy <- logical()
+    }
+
+    invisible(backend)
 }
 
 #' Run setup code on all workers of a parallel backend
@@ -128,7 +271,8 @@ parallel_backend <- function(workers,
 #' environment of every worker of a parallel backend. Use it to load
 #' packages, source files, or define objects that jobs need. The expression
 #' is recorded and replayed automatically on any replacement node created
-#' after a worker failure.
+#' after a worker failure. It may be called before the backend's cluster
+#' exists: the expression is queued and replayed when the backend opens.
 #'
 #' @details The expression is captured unevaluated. Values from the calling
 #'   frame can be injected by wrapping them in double braces, e.g.
@@ -158,8 +302,8 @@ parallel_setup_workers <- function(backend, expr) {
 
     state <- backend$state
 
-    if (!length(state$cl)) {
-        stop("The parallel backend has no workers.", call. = FALSE)
+    if (state$stopped) {
+        stop("The parallel backend has been stopped.", call. = FALSE)
     }
     if (any(state$busy)) {
         stop(
@@ -169,7 +313,13 @@ parallel_setup_workers <- function(backend, expr) {
     }
 
     expr <- .parallel_expr_inject(substitute(expr), parent.frame())
-    .parallel_setup_cluster(state$cl, list(expr))
+
+    # Declarative: run now if the cluster is live, otherwise the recorded
+    # expression is replayed when the backend opens. Either way it is also
+    # replayed on replacement nodes after a worker failure.
+    if (!is.null(state$cl)) {
+        .parallel_setup_cluster(state$cl, list(expr))
+    }
 
     state$setup_exprs[[length(state$setup_exprs) + 1L]] <- expr
 
@@ -222,14 +372,18 @@ parallel_eval_workers <- function(backend, expr) {
 
     state <- backend$state
 
-    if (!length(state$cl)) {
-        stop("The parallel backend has no workers.", call. = FALSE)
-    }
     if (any(state$busy)) {
         stop(
             "Cannot evaluate on workers while jobs are active.",
             call. = FALSE
         )
+    }
+
+    # Evaluation needs live workers: open the backend if necessary.
+    .pump_backend_open(backend)
+
+    if (!length(state$cl)) {
+        stop("The parallel backend has no workers.", call. = FALSE)
     }
 
     expr <- .parallel_expr_inject(substitute(expr), parent.frame())
@@ -256,7 +410,9 @@ parallel_eval_workers <- function(backend, expr) {
 #'
 #' @details By default, stopping fails if jobs are still active. Set
 #'   `force = TRUE` to stop the cluster regardless. Stopping an already
-#'   stopped backend is a no-op.
+#'   stopped backend (or one whose cluster was never started) is a no-op.
+#'   Stopping a backend created with `parallel_backend(cluster = )` is an
+#'   error: the backend does not own that cluster.
 #'
 #' @param backend A backend object created by [parallel_backend()].
 #' @param force If `TRUE`, stop the cluster even if jobs are active.
@@ -272,24 +428,15 @@ parallel_stop <- function(backend, force = FALSE) {
     if (!inherits(backend, "pump_parallel_backend")) {
         stop("backend must be a parallel backend.", call. = FALSE)
     }
-
-    state <- backend$state
-
-    if (!length(state$cl)) {
-        return(invisible(backend))
+    if (!isTRUE(backend$owned)) {
+        stop(
+            "The parallel backend does not own its cluster; stop the ",
+            "cluster yourself with parallel::stopCluster().",
+            call. = FALSE
+        )
     }
 
-    if (!force && any(state$busy)) {
-        stop("Cannot stop a parallel backend with active jobs.", call. = FALSE)
-    }
-
-    tryCatch(
-        parallel::stopCluster(state$cl),
-        finally = {
-            state$cl <- NULL
-            state$busy <- logical()
-        }
-    )
+    .pump_backend_close(backend, force = force)
 
     invisible(backend)
 }
@@ -525,6 +672,13 @@ parallel_stop <- function(backend, force = FALSE) {
     )
 }
 .parallel_recover_worker <- function(backend, worker_id) {
+    if (!isTRUE(backend$owned)) {
+        stop(
+            "Cannot replace a node of a cluster not owned by siphon.",
+            call. = FALSE
+        )
+    }
+
     state <- backend$state
     old_node <- state$cl[[worker_id]]
 
@@ -545,8 +699,21 @@ parallel_stop <- function(backend, force = FALSE) {
 }
 .parallel_retry_job <- function(job, cause) {
     job_state <- job$state
-    state <- job_state$backend$state
+    backend <- job_state$backend
+    state <- backend$state
     worker_id <- job_state$worker_id
+
+    # A non-owned cluster offers no recovery: the failure surfaces as an
+    # item-level error and the dead node stays marked busy (quarantined),
+    # so no further jobs are dispatched to it.
+    if (!isTRUE(backend$owned)) {
+        job_state$result <- .pump_job_failure(simpleError(paste0(
+            "Parallel job failed on a non-owned cluster (no recovery): ",
+            conditionMessage(cause)
+        )))
+        job_state$done <- TRUE
+        return(TRUE)
+    }
 
     repeat {
         if (job_state$retries >= state$retries) {
@@ -615,12 +782,26 @@ parallel_stop <- function(backend, force = FALSE) {
 
 #' @export
 .pump_executor_count.pump_parallel_backend <- function(backend) {
-    length(backend$state$cl)
+    state <- backend$state
+    if (!is.null(state$cl)) {
+        return(length(state$cl))
+    }
+    if (state$stopped) {
+        return(0L)
+    }
+    # not yet opened: capacity is known from the specification
+    if (is.numeric(state$workers) && length(state$workers) == 1L) {
+        as.integer(state$workers)
+    } else {
+        length(state$workers)
+    }
 }
 #' @export
 .pump_executor_register.pump_parallel_backend <- function(backend,
                                                           func,
                                                           args) {
+    .pump_backend_open(backend)
+
     state <- backend$state
     if (!length(state$cl)) {
         stop("The parallel backend has been stopped.", call. = FALSE)
