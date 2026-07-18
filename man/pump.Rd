@@ -24,8 +24,11 @@ implicitly wrapped as a basic source.}
 
 \item{backend}{A backend object or one of \code{"main"}, \code{"mirai"},
 or \code{"future"}. Use \code{parallel_backend()} directly for fault-tolerant
-PSOCK execution (no string alias). If \code{NULL} (the default), the stage
-inherits the backend set by \code{pump_run()} or \code{pump_drain()}.}
+PSOCK execution (no string alias). An explicit backend is resolved and
+validated immediately. If \code{NULL} (the default), the stage inherits the
+backend set by \code{\link[=pump_run]{pump_run()}} or \code{\link[=pump_drain]{pump_drain()}}; the inherited backend
+is resolved and validated when the stage first advances (its first
+beat), and stays fixed from then on.}
 
 \item{max_workers}{Maximum number of active jobs for this stage. Defaults to
 the backend worker count. Ignored for the synchronous \code{main_backend()}

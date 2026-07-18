@@ -159,7 +159,6 @@
 
 # Internal constructor for empty stage objects
 .pump_empty_stage <- function(upstream,
-                              backend,
                               explicit_on_error,
                               explicit_backend = NULL) {
     stats <- .pump_stats()
@@ -197,7 +196,7 @@
         },
         done = function() TRUE,
         close = function() if (is.function(upstream$close)) upstream$close(),
-        backend = function() backend,
+        backend = function() .pump_resolve_backend(backend_policy$get()),
         upstream = function() upstream
     ), class = "pump")
 }
@@ -206,7 +205,6 @@
 .pump_stage <- function(upstream,
                         fn,
                         args,
-                        backend,
                         max_workers,
                         buffer_size,
                         explicit_on_error,
@@ -226,13 +224,40 @@
     if (is.finite(n) && n == 0L) {
         return(.pump_empty_stage(
             upstream = upstream,
-            backend = backend,
             explicit_on_error = explicit_on_error,
             explicit_backend = explicit_backend
         ))
     }
     buf <- .pump_queue(buffer_size)
-    sl <- .pump_slots(max_workers)
+
+    # Backend resolution is lazy. An explicit backend arrives here already
+    # resolved, validated, and sized by pump(), so it is live immediately.
+    # An inherited backend (explicit_backend = NULL) is resolved from the
+    # policy on the first beat - after pump_run()/pump_drain() had the
+    # chance to set the pipeline-wide default - and slot sizing follows it.
+    user_max_workers <- max_workers
+    exec_backend <- explicit_backend
+    sl <- if (is.null(explicit_backend)) NULL else .pump_slots(max_workers)
+    opened <- FALSE
+
+    ensure_backend <- function() {
+        if (opened) {
+            return(invisible(NULL))
+        }
+        if (is.null(exec_backend)) {
+            bk <- .pump_resolve_backend(backend_policy$get())
+            .pump_check_backend(bk)
+            exec_backend <<- bk
+        }
+        if (is.null(sl)) {
+            sl <<- .pump_slots(
+                .pump_size_max_workers(exec_backend, user_max_workers, n)
+            )
+        }
+        .pump_backend_open(exec_backend)
+        opened <<- TRUE
+        invisible(NULL)
+    }
 
     # private methods
     discard_item <- function(msg) {
@@ -308,7 +333,7 @@
     # dispatch one item to the backend and place it in a free slot
     submit_job <- function(msg) {
         t0 <- .pump_now_ms()
-        job <- .pump_executor_new_job(backend, fn, c(list(msg$data), args))
+        job <- .pump_executor_new_job(exec_backend, fn, c(list(msg$data), args))
         stats$add_submit_time(.pump_now_ms() - t0)
         sl$acquire(
             id = list(id = msg$id, idx = .pump_validate_idx(msg$idx)),
@@ -355,6 +380,7 @@
             # one beat: harvest finished work, refill slots, then harvest
             # again so jobs that completed during advance (always, for the
             # synchronous main backend) are visible in the same beat
+            ensure_backend()
             t0 <- .pump_now_ms()
             i0 <- i
             drain_completed()
@@ -403,10 +429,17 @@
             upstream$item_release(id)
         },
         done = function() {
-            upstream$done() && buf$size() == 0L && sl$active() == 0L
+            upstream$done() && buf$size() == 0L &&
+                (is.null(sl) || sl$active() == 0L)
         },
         close = function() if (is.function(upstream$close)) upstream$close(),
-        backend = function() backend,
+        backend = function() {
+            if (!is.null(exec_backend)) {
+                exec_backend
+            } else {
+                .pump_resolve_backend(backend_policy$get())
+            }
+        },
         upstream = function() upstream
     )
 
@@ -432,8 +465,11 @@
 #' @param ... Additional arguments passed to `fn`.
 #' @param backend A backend object or one of `"main"`, `"mirai"`,
 #'   or `"future"`. Use `parallel_backend()` directly for fault-tolerant
-#'   PSOCK execution (no string alias). If `NULL` (the default), the stage
-#'   inherits the backend set by `pump_run()` or `pump_drain()`.
+#'   PSOCK execution (no string alias). An explicit backend is resolved and
+#'   validated immediately. If `NULL` (the default), the stage inherits the
+#'   backend set by [pump_run()] or [pump_drain()]; the inherited backend
+#'   is resolved and validated when the stage first advances (its first
+#'   beat), and stays fixed from then on.
 #' @param max_workers Maximum number of active jobs for this stage. Defaults to
 #'   the backend worker count. Ignored for the synchronous `main_backend()`
 #'   (which always uses 1).
@@ -469,46 +505,15 @@ pump <- function(x,
         on_error <- match.arg(on_error, c("stop", "collect", "continue"))
     }
 
-    # Resolve backend: explicit backend parameter, or default from upstream,
-    # or "main"
-    if (is.null(backend)) {
-        if (is.function(x$get_backend)) {
-            backend <- x$get_backend()
-        } else {
-            backend <- "main"
-        }
-    }
-
-    # Resolve and validate backend
-    backend <- .pump_resolve_backend(backend)
-    if (.pump_executor_count(backend) < 1L) {
-        if (inherits(backend, "pump_mirai_backend")) {
-            stop(
-                "No active mirai daemons found. ",
-                "Please call mirai::daemons(n) before starting the pipeline."
-            )
-        } else {
-            stop("backend must have at least one process")
-        }
-    }
-
-    # Compute max_workers
-    if (inherits(backend, "pump_main_backend")) {
-        max_workers <- 1L
-    } else if (is.null(max_workers)) {
-        max_workers <- .pump_executor_count(backend)
-    }
+    # An explicit backend is resolved, validated, and sized eagerly so
+    # mistakes fail fast at construction. backend = NULL defers to the
+    # pipeline default set by pump_run()/pump_drain(): the stage resolves,
+    # validates, and sizes it on its first beat.
     n <- x$length()
-    if (is.finite(n)) {
-        max_workers <- as.integer(max(1L, min(n, max_workers)))
-    } else {
-        max_workers <- as.integer(max(1L, max_workers))
-    }
-    if (max_workers > .pump_executor_count(backend)) {
-        stop(
-            "max_workers (", max_workers, ") exceeds executor count (",
-            .pump_executor_count(backend), ") for backend"
-        )
+    if (!is.null(backend)) {
+        backend <- .pump_resolve_backend(backend)
+        .pump_check_backend(backend)
+        max_workers <- .pump_size_max_workers(backend, max_workers, n)
     }
 
     # Compute buffer_size
@@ -529,10 +534,9 @@ pump <- function(x,
         upstream = x,
         fn = fn,
         args = args,
-        backend = backend,
         max_workers = max_workers,
         buffer_size = buffer_size,
         explicit_on_error = on_error,
-        explicit_backend = if (is.null(backend)) NULL else backend
+        explicit_backend = backend
     )
 }

@@ -109,6 +109,57 @@ test_that("pump_drain on_error = 'collect' delivers failures to handle_fn", {
     expect_equal(oks, list(TRUE, FALSE, TRUE))
 })
 
+test_that("pump_run backend default reaches NULL-backend stages", {
+    skip_if_not_installed("future")
+    old_plan <- future::plan("sequential")
+    on.exit(future::plan(old_plan), add = TRUE)
+    f <- 1:3 |> pump(function(x) x * 2)
+    out <- pump_run(f, verbose = FALSE, backend = "future")
+    expect_equal(out, list(2, 4, 6))
+    expect_s3_class(f$backend(), "pump_future_backend")
+})
+
+test_that("backend objects can be inherited via pump_run", {
+    skip_if_not_installed("future")
+    old_plan <- future::plan("sequential")
+    on.exit(future::plan(old_plan), add = TRUE)
+    f <- 1:3 |> pump(function(x) x + 1)
+    out <- pump_run(f, verbose = FALSE, backend = future_backend())
+    expect_equal(out, list(2, 3, 4))
+    expect_s3_class(f$backend(), "pump_future_backend")
+})
+
+test_that("explicit stage backend wins over the pump_run default", {
+    skip_if_not_installed("future")
+    old_plan <- future::plan("sequential")
+    on.exit(future::plan(old_plan), add = TRUE)
+    f <- 1:3 |> pump(function(x) x * 2, backend = "main")
+    out <- pump_run(f, verbose = FALSE, backend = "future")
+    expect_equal(out, list(2, 4, 6))
+    expect_s3_class(f$backend(), "pump_main_backend")
+})
+
+test_that("deferred stages size slots from the inherited backend", {
+    f <- 1:10 |> pump(function(x) x)
+    expect_null(f$slots())
+    out <- pump_run(f, verbose = FALSE)
+    expect_length(out, 10)
+    expect_identical(f$slots()$limit(), 1L)
+})
+
+test_that("invalid backends fail with a helpful message", {
+    expect_error(pump(1:3, identity, backend = "parallel"), "no string alias")
+    expect_error(pump(1:3, identity, backend = "bogus"), "invalid backend")
+    expect_error(pump(1:3, identity, backend = list()), "backend object")
+})
+
+test_that("inherited backends are validated when the pipeline first runs", {
+    skip_if_not_installed("mirai")
+    skip_if(mirai::status()$connections > 0, "mirai daemons active")
+    f <- 1:3 |> pump(function(x) x)
+    expect_error(pump_run(f, verbose = FALSE, backend = "mirai"), "daemons")
+})
+
 test_that("pump_drain on_error = 'stop' (default) throws on first error", {
     f <- 1:3 |>
         pump(function(x) if (x == 2) stop("boom") else x, backend = "main")

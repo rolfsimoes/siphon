@@ -1,13 +1,60 @@
 .pump_resolve_backend <- function(backend) {
-    if (!is.character(backend)) {
-        return(backend)
+    if (is.character(backend)) {
+        return(switch(backend,
+            future = future_backend(),
+            mirai = mirai_backend(),
+            main = main_backend(),
+            stop(
+                "invalid backend \"", backend, "\"; use \"main\", ",
+                "\"mirai\", \"future\", or a backend object ",
+                "(parallel_backend() has no string alias)"
+            )
+        ))
     }
-    switch(backend,
-        future = future_backend(),
-        mirai = mirai_backend(),
-        main = main_backend(),
-        stop("invalid backend")
-    )
+    if (!inherits(backend, "pump_backend")) {
+        stop(
+            "backend must be a backend object or one of ",
+            "\"main\", \"mirai\", \"future\""
+        )
+    }
+    backend
+}
+
+# A backend must be usable before jobs are dispatched to it.
+.pump_check_backend <- function(backend) {
+    if (.pump_executor_count(backend) < 1L) {
+        if (inherits(backend, "pump_mirai_backend")) {
+            stop(
+                "No active mirai daemons found. ",
+                "Please call mirai::daemons(n) before starting the pipeline."
+            )
+        }
+        stop("backend must have at least one process")
+    }
+    invisible(backend)
+}
+
+# Effective slot count for a stage: the main backend is always serial, the
+# default is the backend's executor count, and the result is capped by a
+# finite upstream length and validated against the executor count.
+.pump_size_max_workers <- function(backend, max_workers, n) {
+    if (inherits(backend, "pump_main_backend")) {
+        max_workers <- 1L
+    } else if (is.null(max_workers)) {
+        max_workers <- .pump_executor_count(backend)
+    }
+    if (is.finite(n)) {
+        max_workers <- as.integer(max(1L, min(n, max_workers)))
+    } else {
+        max_workers <- as.integer(max(1L, max_workers))
+    }
+    if (max_workers > .pump_executor_count(backend)) {
+        stop(
+            "max_workers (", max_workers, ") exceeds executor count (",
+            .pump_executor_count(backend), ") for backend"
+        )
+    }
+    max_workers
 }
 
 .pump_executor_count <- function(backend) {

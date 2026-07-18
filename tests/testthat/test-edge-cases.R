@@ -1,10 +1,23 @@
 test_that("backend with zero workers errors at stage creation", {
-    zero_backend <- structure(list(), class = "pump_zero_backend")
-    registerS3method(".pump_executor_count", "pump_zero_backend", function(x) 0L)
+    zero_backend <- structure(
+        list(name = "zero", owned = FALSE),
+        class = c("pump_zero_backend", "pump_backend")
+    )
+    registerS3method(
+        ".pump_executor_count", "pump_zero_backend", function(x) 0L
+    )
 
     expect_error(
         pump(1:3, identity, backend = zero_backend),
         "at least one process"
+    )
+})
+
+test_that("backends without the pump_backend class are rejected", {
+    legacy_backend <- structure(list(), class = "pump_legacy_backend")
+    expect_error(
+        pump(1:3, identity, backend = legacy_backend),
+        "backend object"
     )
 })
 
