@@ -18,6 +18,13 @@ Note: When using future_backend(), you are responsible for managing
 the future plan lifecycle. Call \code{future::plan()} to set a plan and restore
 the previous plan when done. See the vignette for examples.
 
+Globals required by the stage function are detected automatically by
+the \code{future} framework, exactly as in a plain \code{future::future()} call.
+Because plans provide no persistent worker state, the function and its
+detected globals travel with every job; for stages with large captured
+state, prefer \code{\link[=mirai_backend]{mirai_backend()}} or \code{\link[=parallel_backend]{parallel_backend()}}, which install
+the stage payload on each worker once.
+
 Fault tolerance is delegated to the \code{future} framework: this backend
 performs no retries. If a worker dies while running a job, the
 resulting \code{FutureError} is surfaced as a \code{pump_error} value for that

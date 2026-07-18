@@ -54,6 +54,14 @@ the "Pooling strategies" section of \code{vignette("siphon")}.
 
 This backend uses the unexported \code{sendCall()} and \code{recvResult()}
 functions from the \code{parallel} package to communicate with cluster nodes.
+
+When a stage first advances, its function and constant arguments are
+installed once on every node as a per-stage runner; each job then
+ships only the item data. Runner installations are recorded alongside
+\code{\link[=parallel_setup_workers]{parallel_setup_workers()}} expressions and replayed on replacement
+nodes after a worker failure. Stage functions must be self-contained
+or carry their dependencies in their closure environment; objects they
+reference from the global environment are not shipped.
 }
 \section{Fault tolerance}{
 
