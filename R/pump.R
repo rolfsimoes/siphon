@@ -238,6 +238,7 @@
     user_max_workers <- max_workers
     exec_backend <- explicit_backend
     sl <- if (is.null(explicit_backend)) NULL else .pump_slots(max_workers)
+    stage_handle <- NULL
     opened <- FALSE
 
     ensure_backend <- function() {
@@ -255,6 +256,9 @@
             )
         }
         .pump_backend_open(exec_backend)
+        # install the stage's static payload (fn and constant args) on the
+        # backend once; jobs then ship only the item data
+        stage_handle <<- .pump_executor_register(exec_backend, fn, args)
         opened <<- TRUE
         invisible(NULL)
     }
@@ -333,7 +337,7 @@
     # dispatch one item to the backend and place it in a free slot
     submit_job <- function(msg) {
         t0 <- .pump_now_ms()
-        job <- .pump_executor_new_job(exec_backend, fn, c(list(msg$data), args))
+        job <- .pump_executor_new_job(exec_backend, stage_handle, msg$data)
         stats$add_submit_time(.pump_now_ms() - t0)
         sl$acquire(
             id = list(id = msg$id, idx = .pump_validate_idx(msg$idx)),
