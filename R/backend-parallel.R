@@ -85,12 +85,7 @@ parallel_backend <- function(workers,
                              ...,
                              retries = 3L,
                              retry_sleep = 0) {
-    if (!requireNamespace("parallel", quietly = TRUE)) {
-        stop(
-            "Package 'parallel' is required for parallel_backend() ",
-            "but is not installed."
-        )
-    }
+    .pump_need_pkg("parallel", "parallel_backend()")
 
     retries <- as.integer(retries)
     if (length(retries) != 1L || is.na(retries) || retries < 0L) {
@@ -113,7 +108,10 @@ parallel_backend <- function(workers,
     state$retries <- retries
     state$retry_sleep <- retry_sleep
 
-    structure(list(state = state), class = "pump_parallel_backend")
+    structure(
+        list(name = "parallel", owned = TRUE, state = state),
+        class = c("pump_parallel_backend", "pump_backend")
+    )
 }
 
 #' Run setup code on all workers of a parallel backend
@@ -603,17 +601,14 @@ parallel_stop <- function(backend, force = FALSE) {
 
     state$busy[worker_id] <- FALSE
 
-    err <- simpleError(
+    job_state$result <- .pump_job_failure(simpleError(
         paste0(
             "Parallel job failed after ",
             job_state$retries,
             " retries: ",
             conditionMessage(cause)
         )
-    )
-    class(err) <- c("pump_error", class(err))
-
-    job_state$result <- list(value = err, fn_time = 0)
+    ))
     job_state$done <- TRUE
 
     TRUE
@@ -694,11 +689,9 @@ parallel_stop <- function(backend, force = FALSE) {
     state$busy[worker_id] <- FALSE
 
     if (inherits(res, "try-error")) {
-        err <- simpleError(as.character(res))
-        class(err) <- c("pump_error", class(err))
-        res <- list(value = err, fn_time = 0)
+        res <- .pump_job_failure(simpleError(as.character(res)))
     } else if (inherits(res, "pump_error")) {
-        res <- list(value = res, fn_time = 0)
+        res <- .pump_job_failure(res)
     }
 
     job$state$result <- res
@@ -709,16 +702,4 @@ parallel_stop <- function(backend, force = FALSE) {
 #' @export
 .pump_job_data.pump_parallel_job <- function(job) {
     if (.pump_job_is_ready(job)) job$state$result
-}
-
-#' Print a parallel backend
-#'
-#' @param x A parallel backend object.
-#' @param ... Unused.
-#' @return The input `x`, invisibly.
-#' @export
-print.pump_parallel_backend <- function(x, ...) {
-    cat("<pump_parallel_backend>\n")
-    cat("  workers: ", .pump_executor_count(x), "\n", sep = "")
-    invisible(x)
 }

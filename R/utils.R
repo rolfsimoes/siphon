@@ -8,15 +8,16 @@
 
 # Human-readable backend name for status and print output
 .pump_backend_name <- function(backend) {
-    if (inherits(backend, "pump_main_backend")) {
-        "main"
-    } else if (inherits(backend, "pump_mirai_backend")) {
-        "mirai"
-    } else if (inherits(backend, "pump_future_backend")) {
-        "future"
-    } else if (inherits(backend, "pump_parallel_backend")) {
-        "parallel"
-    } else {
-        "unknown"
+    backend$name %||% "unknown"
+}
+
+# Shared guard for backend constructors with soft dependencies
+.pump_need_pkg <- function(pkg, what) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+        stop(
+            "Package '", pkg, "' is required for ", what,
+            " but is not installed. Please install it with ",
+            "install.packages('", pkg, "')."
+        )
     }
 }

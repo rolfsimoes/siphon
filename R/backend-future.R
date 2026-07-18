@@ -25,14 +25,11 @@
 #' }
 #' @export
 future_backend <- function() {
-    if (!requireNamespace("future", quietly = TRUE)) {
-        stop(
-            "Package 'future' is required for future_backend() ",
-            "but is not installed. Please install it with ",
-            "install.packages('future')."
-        )
-    }
-    structure(list(), class = "pump_future_backend")
+    .pump_need_pkg("future", "future_backend()")
+    structure(
+        list(name = "future", owned = FALSE),
+        class = c("pump_future_backend", "pump_backend")
+    )
 }
 
 #' @export
@@ -59,21 +56,6 @@ future_backend <- function() {
     }
     tryCatch(
         future::value(job$result),
-        FutureError = function(e) {
-            class(e) <- unique(c("pump_error", class(e)))
-            list(value = e, fn_time = 0)
-        }
+        FutureError = function(e) .pump_job_failure(e)
     )
-}
-
-#' Print a future backend
-#'
-#' @param x A future backend object.
-#' @param ... Unused.
-#' @return The input `x`, invisibly.
-#' @export
-print.pump_future_backend <- function(x, ...) {
-    cat("<pump_future_backend>\n")
-    cat("  workers: ", .pump_executor_count(x), "\n", sep = "")
-    invisible(x)
 }

@@ -24,14 +24,11 @@
 #' }
 #' @export
 mirai_backend <- function() {
-    if (!requireNamespace("mirai", quietly = TRUE)) {
-        stop(
-            "Package 'mirai' is required for mirai_backend() ",
-            "but is not installed. Please install it with ",
-            "install.packages('mirai')."
-        )
-    }
-    structure(list(), class = "pump_mirai_backend")
+    .pump_need_pkg("mirai", "mirai_backend()")
+    structure(
+        list(name = "mirai", owned = FALSE),
+        class = c("pump_mirai_backend", "pump_backend")
+    )
 }
 
 #' @export
@@ -62,21 +59,9 @@ mirai_backend <- function() {
         } else {
             as.character(res)
         }
-        err <- simpleError(paste0("mirai worker failed: ", msg))
-        class(err) <- c("pump_error", class(err))
-        res <- list(value = err, fn_time = 0)
+        res <- .pump_job_failure(
+            simpleError(paste0("mirai worker failed: ", msg))
+        )
     }
     res
-}
-
-#' Print a mirai backend
-#'
-#' @param x A mirai backend object.
-#' @param ... Unused.
-#' @return The input `x`, invisibly.
-#' @export
-print.pump_mirai_backend <- function(x, ...) {
-    cat("<pump_mirai_backend>\n")
-    cat("  workers: ", .pump_executor_count(x), "\n", sep = "")
-    invisible(x)
 }

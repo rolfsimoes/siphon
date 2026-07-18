@@ -10,7 +10,10 @@
 #' pump_run(f, verbose = FALSE)
 #' @export
 main_backend <- function() {
-    structure(list(), class = "pump_main_backend")
+    structure(
+        list(name = "main", owned = FALSE),
+        class = c("pump_main_backend", "pump_backend")
+    )
 }
 
 #' @export
@@ -26,15 +29,3 @@ main_backend <- function() {
 .pump_job_is_ready.pump_main_job <- function(job) TRUE
 #' @export
 .pump_job_data.pump_main_job <- function(job) job$result
-
-#' Print a main backend
-#'
-#' @param x A main backend object.
-#' @param ... Unused.
-#' @return The input `x`, invisibly.
-#' @export
-print.pump_main_backend <- function(x, ...) {
-    cat("<pump_main_backend>\n")
-    cat("  workers: ", .pump_executor_count(x), "\n", sep = "")
-    invisible(x)
-}

@@ -30,7 +30,7 @@
 }
 
 .pump_error <- function(e) {
-    class(e) <- c("pump_error", class(e))
+    class(e) <- unique(c("pump_error", class(e)))
     e
 }
 
