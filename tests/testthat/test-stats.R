@@ -50,8 +50,10 @@ test_that("fn_time and submit_time are recorded in milliseconds", {
     expect_gte(st$fn_time, 3 * 20 * 0.9)
     expect_lt(st$fn_time, 3000)
     expect_equal(st$fn_per_item, st$fn_time / 3)
-    # main backend runs the job inside submit, so submit_time covers fn_time
-    expect_gte(st$submit_time, st$fn_time * 0.9)
+    # main backend runs the job inside submit, so submit_time covers
+    # fn_time; generous tolerance because the two are taken with different
+    # clocks (proc.time() vs Sys.time()) that can drift apart under load
+    expect_gte(st$submit_time, st$fn_time * 0.75)
     expect_gte(st$coord_time, 0)
 })
 
