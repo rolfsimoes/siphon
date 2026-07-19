@@ -42,17 +42,21 @@ shares in \verb{[0, 1]} (\code{NA} before the first beat).
 \item \code{throughput} - completed items per second over the observed beat span
 (\code{NA} until two beats have happened; the span includes any pauses
 between interactive calls).
-\item \code{in_flight} - one entry per active slot: \code{id}, \code{idx}, and \code{since}
-(submission time) of the item currently being processed.
+\item \code{in_flight} - one entry per active slot: \code{id}, \code{idx}, \code{since}
+(submission time), and \code{age_secs} (seconds in flight at snapshot time)
+of the item currently being processed.
 \item \code{buffered_ids} - ids of the first few items ready in the buffer.
 }
 
 For plain sources the result is flat and reports \code{completed}, \code{errors},
 \code{pop_hits}, \code{pop_misses}, and \code{pull_time} (ms inside \code{pop_item()}).
-For pipelines, the last stage's fields are also copied to the top level
-for convenience, plus \code{delivered} - the number of items that left the
-pipeline (popped from the terminal stage by \code{pump_run()}, \code{pump_pop()},
-or \code{pop_item()}); shown as the sink in \code{print()}.
+For pipelines, the result also carries \code{delivered} - the number of items
+that left the pipeline (popped from the terminal stage by \code{pump_run()},
+\code{pump_pop()}, or \code{pop_item()}); shown as the sink in \code{print()}.
+
+For pipelines, the terminal stage's scalar fields are additionally copied
+to the top level. \strong{This flat copy is deprecated} and will be removed in
+a future minor release; read per-stage values from \code{x$stages} instead.
 }
 \description{
 \code{pump_status()} returns a snapshot of a pump object's internal state,

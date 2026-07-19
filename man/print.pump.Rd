@@ -56,7 +56,6 @@ specific elements. The system uses standard 16-color ANSI codes:
 \item{bright_yellow = "93"}{bright warning}
 \item{bright_red = "91"}{bright error}
 }
-
 Element-specific color names:
 \describe{
 \item{header}{pipeline header text}
@@ -76,12 +75,13 @@ Element-specific color names:
 \item{blk}{blocked share label}
 \item{bottleneck}{bottleneck marker}
 }
-
 Examples:
-\code{options(siphon.colors = list(stage = "96"))} to make stage names cyan
-\code{options(siphon.colors = list(wrk = "1;34"))} to make workers label bold blue
-\code{options(siphon.colors = list(bright_red = "35"))} to change error color to purple
-
+\code{options(siphon.colors = list(stage = "96"))} to make stage names
+cyan
+\code{options(siphon.colors = list(wrk = "1;34"))} to make workers label
+bold blue
+\code{options(siphon.colors = list(bright_red = "35"))} to change error
+color to purple
 To disable colors globally, set \code{options(siphon.color = FALSE)}.
 }
 
