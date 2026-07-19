@@ -84,7 +84,10 @@ test_that("pump_source defaults to infinite source", {
     src <- pump_source(
         pull_fn = function() invisible(NULL)
     )
-    expect_equal(length(src), Inf)
+    # length() reports NA_integer_ for an infinite source (F6/D1); the raw
+    # count is still Inf via the internal accessor.
+    expect_identical(length(src), NA_integer_)
+    expect_identical(src$length(), Inf)
     expect_false(src$done())
 })
 

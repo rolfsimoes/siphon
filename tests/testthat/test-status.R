@@ -282,3 +282,84 @@ test_that("source stats report pop hits, misses, and pull_time in ms", {
     expect_gte(snap$pull_time, 2 * 20 * 0.9)
     expect_lt(snap$pull_time, 2000)
 })
+
+test_that("empty-stage pipeline reports as a stage not a flat source (F4)", {
+    # A stage over an empty source has no buffer and no slots, exactly like a
+    # source. Detection is by the role tag, so it must still walk as a stage.
+    f <- pump(list(), function(x) x)
+    st <- pump_status(f)
+
+    expect_length(st$stages, 1L)
+    expect_false(is.null(st$source))
+    expect_equal(st$stages[[1]]$completed, 0L)
+
+    # print() draws the frame (source -> stage -> sink), not the flat source
+    old <- options(siphon.color = FALSE, siphon.unicode = FALSE)
+    on.exit(options(old), add = TRUE)
+    lines <- format(st, header = "pump")
+    expect_match(paste(lines, collapse = "\n"), "stage 1")
+})
+
+test_that("all four constructors carry an explicit role tag (F4)", {
+    stage <- 1:3 |> pump(function(x) x, backend = "main")
+    empty <- pump(list(), function(x) x)
+    basic <- siphon:::.pump_source_basic(1:3)
+    custom <- pump_source(function() NULL)
+
+    expect_identical(attr(stage, "role"), "stage")
+    expect_identical(attr(empty, "role"), "stage")
+    expect_identical(attr(basic, "role"), "source")
+    expect_identical(attr(custom, "role"), "source")
+
+    # sources must not expose stage-only members; run.R and the driver guard
+    # on is.function(x$upstream) / is.function(x$set_on_error)
+    expect_false(is.function(basic$upstream))
+    expect_false(is.function(basic$set_on_error))
+    expect_false(is.function(custom$upstream))
+    expect_false(is.function(custom$set_on_error))
+})
+
+make_fake_stage <- function(beats = 10L, working = 0, starved = 0,
+                            blocked = 0) {
+    list(
+        beats = beats,
+        share_working = working,
+        share_starved = starved,
+        share_blocked = blocked
+    )
+}
+
+test_that(".pump_find_bottleneck spots the dominant stage", {
+    # downstream of the bottleneck is starved
+    stages <- list(
+        make_fake_stage(working = 0.9, starved = 0.1),
+        make_fake_stage(working = 0.2, starved = 0.8)
+    )
+    expect_equal(siphon:::.pump_find_bottleneck(stages), 1L)
+
+    # terminal bottleneck: upstream blocked behind it
+    stages <- list(
+        make_fake_stage(working = 0.4, blocked = 0.6),
+        make_fake_stage(working = 0.95)
+    )
+    expect_equal(siphon:::.pump_find_bottleneck(stages), 2L)
+
+    # balanced pipeline: no bottleneck
+    stages <- list(
+        make_fake_stage(working = 0.9),
+        make_fake_stage(working = 0.9)
+    )
+    expect_true(is.na(siphon:::.pump_find_bottleneck(stages)))
+
+    # too few beats: no verdict
+    stages <- list(
+        make_fake_stage(beats = 2L, working = 1),
+        make_fake_stage(beats = 2L, working = 0.1, starved = 0.9)
+    )
+    expect_true(is.na(siphon:::.pump_find_bottleneck(stages)))
+
+    # single stage: bottleneck is meaningless
+    expect_true(is.na(
+        siphon:::.pump_find_bottleneck(list(make_fake_stage(working = 1)))
+    ))
+})
