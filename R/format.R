@@ -29,89 +29,122 @@
     isTRUE(l10n_info()[["UTF-8"]])
 }
 
-.pump_style <- function(x, style, use = TRUE) {
-    if (!use || !nzchar(x)) {
-        return(x)
+# Semantic color palette: name -> ANSI SGR code. Nord-inspired, using the
+# standard 16-color codes for broad terminal compatibility. This is the single
+# source of truth for every color siphon emits; hoisted to a package constant
+# so it is built once at load, not rebuilt on every styled fragment.
+.pump_palette <- c(
+    bold = "1",
+    dim = "2",
+    # Primary colors (Nord-inspired)
+    blue = "34",        # frost blue (primary)
+    cyan = "36",        # lighter frost
+    # Status colors (aurora)
+    green = "32",       # success
+    yellow = "33",      # warning
+    orange = "33",      # alert (using yellow)
+    red = "31",         # error
+    purple = "35",      # info
+    # Bright variants for better visibility
+    bright_blue = "94",
+    bright_cyan = "96",
+    bright_green = "92",
+    bright_yellow = "93",
+    bright_red = "91",
+    bright_purple = "95"
+)
+
+# UI element -> palette name. Naming the palette entry (rather than repeating a
+# raw code) keeps the two in sync and makes the intent readable; "" means no
+# color. Resolved to raw codes once below.
+.pump_element_styles <- c(
+    header = "bold",
+    source = "bold",
+    sink = "bold",
+    stage = "bright_blue",
+    backend = "",
+    wrk = "dim",
+    buf = "dim",
+    done = "dim",
+    err = "dim",                # values use bright_red when > 0
+    fn = "dim",
+    crd = "dim",
+    beat = "dim",
+    wrk_share = "bright_green",
+    stv = "bright_yellow",
+    blk = "bright_red",
+    bottleneck = "bright_red"
+)
+
+# Element -> ANSI code, resolved once against the default palette at load.
+# Held as its own table (not re-derived per call) so that a runtime palette
+# override does not silently retint elements: the documented contract is that
+# options(siphon.colors=) overrides a palette name OR an element name, each
+# independently.
+.pump_element_codes <- vapply(
+    .pump_element_styles,
+    function(sem) if (nzchar(sem)) unname(.pump_palette[[sem]]) else "",
+    character(1)
+)
+
+# Resolve the full name -> ANSI lookup for one format() call. Merges any
+# options(siphon.colors = list(...)) override into the palette and element
+# tables exactly once, then flattens both namespaces into a single vector that
+# .pump_style() indexes per fragment. Returns NULL when color is off, which is
+# the signal .pump_style() reads to skip styling.
+.pump_theme <- function(color = TRUE) {
+    if (!isTRUE(color)) {
+        return(NULL)
     }
-    # Default Nord-inspired palette using standard 16-color ANSI for compatibility
-    # Base styles
-    default_codes <- c(
-        bold = "1",
-        dim = "2",
-        # Primary colors (Nord-inspired)
-        blue = "34",        # frost blue (primary)
-        cyan = "36",        # lighter frost
-        # Status colors (aurora)
-        green = "32",       # success
-        yellow = "33",      # warning
-        orange = "33",      # alert (using yellow)
-        red = "31",         # error
-        purple = "35",      # info
-        # Bright variants for better visibility
-        bright_blue = "94",
-        bright_cyan = "96",
-        bright_green = "92",
-        bright_yellow = "93",
-        bright_red = "91",
-        bright_purple = "95"
-    )
-    
-    # Element-specific colors (can be overridden via options)
-    element_colors <- c(
-        header = "1",              # bold
-        source = "1",              # bold
-        sink = "1",                # bold
-        stage = "94",              # bright blue
-        backend = "",              # no color (black)
-        wrk = "2",                 # dim
-        buf = "2",                 # dim
-        done = "2",                # dim
-        err = "2",                 # dim (values use bright_red when > 0)
-        fn = "2",                  # dim
-        crd = "2",                 # dim
-        beat = "2",                # dim
-        wrk_share = "92",          # bright green (was work)
-        stv = "93",                # bright yellow (was starv)
-        blk = "91",                # bright red (was block)
-        bottleneck = "91"          # bright red
-    )
-    
-    # Allow custom colors via options(siphon.colors = list(...))
-    custom_colors <- getOption("siphon.colors", NULL)
-    if (!is.null(custom_colors) && is.list(custom_colors)) {
-        # Merge custom colors with both base codes and element colors
-        for (name in names(custom_colors)) {
-            if (name %in% names(default_codes)) {
-                default_codes[name] <- custom_colors[[name]]
-            }
-            if (name %in% names(element_colors)) {
-                element_colors[name] <- custom_colors[[name]]
-            }
+    palette <- .pump_palette
+    elements <- .pump_element_codes
+    custom <- getOption("siphon.colors", NULL)
+    if (is.list(custom)) {
+        for (name in names(custom)) {
+            if (name %in% names(palette)) palette[name] <- custom[[name]]
+            if (name %in% names(elements)) elements[name] <- custom[[name]]
         }
     }
-    
-    # Combine all codes
-    codes <- c(default_codes, element_colors)
-    
-    # Handle compound styles like "bold blue"
-    style_parts <- strsplit(style, " ")[[1]]
-    ansi_codes <- unname(codes[style_parts])
-    # Filter out empty strings
-    ansi_codes <- ansi_codes[nzchar(ansi_codes)]
-    if (length(ansi_codes) > 1) {
-        ansi_code <- paste(ansi_codes, collapse = ";")
-    } else if (length(ansi_codes) == 1) {
-        ansi_code <- ansi_codes
-    } else {
-        ansi_code <- ""
-    }
-    
-    if (nzchar(ansi_code)) {
-        paste0("\x1b[", ansi_code, "m", x, "\x1b[0m")
-    } else {
-        x
-    }
+    c(palette, elements)
 }
+
+# Wrap x in the ANSI codes named by `style` (space-separated for compound
+# styles like "bold blue"), looked up in a theme built by .pump_theme(). A
+# NULL theme (color off) or an empty x is returned unchanged.
+.pump_style <- function(x, style, theme) {
+    if (is.null(theme) || !nzchar(x)) {
+        return(x)
+    }
+    ansi_codes <- unname(theme[strsplit(style, " ")[[1]]])
+    ansi_codes <- ansi_codes[nzchar(ansi_codes)]
+    if (length(ansi_codes) == 0L) {
+        return(x)
+    }
+    paste0("\x1b[", paste(ansi_codes, collapse = ";"), "m", x, "\x1b[0m")
+}
+
+# --- Rendering constants ---------------------------------------------------
+
+# Box-drawing glyphs for the pipeline frame. \u escapes keep the source
+# ASCII-only; the ASCII set is the degraded form for non-UTF-8 locales.
+.pump_glyphs_unicode <- c(
+    top = "\u250c\u2500", mid = "\u251c\u2500",
+    pipe = "\u2502", bot = "\u2514\u2500"
+)
+.pump_glyphs_ascii <- c(top = "+-", mid = "+-", pipe = "|", bot = "+-")
+
+# Occupancy bar: number of cells inside the [.....] brackets.
+.pump_bar_width <- 5L
+
+# Stuck-job tell: flag an in-flight item older than factor x the average
+# per-item time, but only once it has run at least this many seconds.
+.pump_stuck_factor <- 10
+.pump_stuck_floor_secs <- 1
+
+# .pump_fmt_ms thresholds: whole seconds at or above the first, whole
+# milliseconds at or above the second, else one decimal millisecond.
+.pump_ms_secs_at <- 10000
+.pump_ms_whole_at <- 100
 
 # Width of a string as seen on screen, ignoring ANSI escapes
 .pump_visible_width <- function(x) {
@@ -125,8 +158,8 @@
 # Occupancy bar like [##--]; fixed width of 5 chars inside brackets.
 # The fill is colored (green, or red when full-and-meaningful), the empty
 # part is dimmed.
-.pump_bar <- function(filled, capacity, color, fill_style = "green",
-                      width = 5L) {
+.pump_bar <- function(filled, capacity, theme, fill_style = "green",
+                      width = .pump_bar_width) {
     if (!is.finite(capacity) || capacity < 1L) {
         return("[]")
     }
@@ -135,19 +168,48 @@
     n_fill <- min(n_fill, width)
     paste0(
         "[",
-        .pump_style(strrep("#", n_fill), fill_style, color),
-        .pump_style(strrep("-", width - n_fill), "dim", color),
+        .pump_style(strrep("#", n_fill), fill_style, theme),
+        .pump_style(strrep("-", width - n_fill), "dim", theme),
         "]"
     )
+}
+
+# "styled label + value" building block, e.g. `wrk [##--] 2/4` or `done 8`.
+# The label is styled with `style` (defaulting to the label name, which is also
+# its element style); the value is placed verbatim after a single space.
+.pump_metric <- function(label, value, theme, style = label) {
+    paste0(.pump_style(label, style, theme), " ", value)
+}
+
+# Error-count chip, unified across the source and stage rows (F11/D3): `err N`
+# in bright red when N > 0, a dim `err 0` otherwise.
+.pump_err_chip <- function(n, theme) {
+    if (n > 0L) {
+        .pump_style(sprintf("err %d", n), "bright_red", theme)
+    } else {
+        .pump_style("err 0", "err", theme)
+    }
+}
+
+# One beat-state share, e.g. `wrk 100%`: the value is styled with `style` when
+# positive and dimmed when zero, then labelled.
+.pump_share_metric <- function(share, style, name, theme) {
+    val <- .pump_fmt_share(share)
+    val <- if (isTRUE(share > 0)) {
+        .pump_style(val, style, theme)
+    } else {
+        .pump_style(val, "dim", theme)
+    }
+    .pump_metric(name, val, theme)
 }
 
 .pump_fmt_ms <- function(ms) {
     if (is.null(ms) || !is.finite(ms)) {
         return("--")
     }
-    if (ms >= 10000) {
+    if (ms >= .pump_ms_secs_at) {
         sprintf("%.1fs", ms / 1000)
-    } else if (ms >= 100) {
+    } else if (ms >= .pump_ms_whole_at) {
         sprintf("%.0fms", ms)
     } else {
         sprintf("%.1fms", ms)
@@ -165,35 +227,169 @@
     if (!is.finite(n)) "Inf" else format(n)
 }
 
-# Pick the bottleneck stage index, or NA when there is no clear signal.
-# Heuristic: the stage with the highest working share, provided it has seen
-# enough beats to be meaningful, is working most of the time, and its
-# neighbors corroborate (downstream starving, or upstream blocked behind it).
-.pump_find_bottleneck <- function(stages) {
-    n <- length(stages)
-    if (n < 2L) {
-        return(NA_integer_)
+# Pad a column of (ANSI-styled) cells to their common visible width.
+.pump_pad_column <- function(cells) {
+    w <- max(vapply(cells, .pump_visible_width, integer(1)))
+    vapply(cells, .pump_pad_to, character(1), width = w)
+}
+
+# Build the three aligned columns (workers, buffer, done) shared by the stage
+# rows, so each is padded to a width common across every stage.
+.pump_stage_columns <- function(stages, theme) {
+    work <- character(length(stages))
+    out <- character(length(stages))
+    done <- character(length(stages))
+    for (i in seq_along(stages)) {
+        s <- stages[[i]]
+        buffer_full <- s$buffer_capacity > 0L &&
+            s$buffer_size >= s$buffer_capacity
+        work[i] <- .pump_metric("wrk", paste0(
+            .pump_bar(s$workers_active, s$workers_limit, theme),
+            " ", s$workers_active, "/", s$workers_limit
+        ), theme)
+        out[i] <- .pump_metric("buf", paste0(
+            .pump_bar(
+                s$buffer_size, s$buffer_capacity, theme,
+                fill_style = if (buffer_full) "red" else "green"
+            ),
+            " ", s$buffer_size, "/", s$buffer_capacity
+        ), theme)
+        done[i] <- .pump_metric("done", s$completed, theme)
     }
-    shares <- vapply(stages, function(s) {
-        if (isTRUE(s$beats >= 5L) && is.finite(s$share_working)) {
-            s$share_working
-        } else {
-            -Inf
-        }
-    }, numeric(1))
-    cand <- which.max(shares)
-    if (!is.finite(shares[cand]) || shares[cand] < 0.5) {
-        return(NA_integer_)
-    }
-    downstream_starved <- cand < n &&
-        isTRUE(stages[[cand + 1L]]$share_starved > 0.25)
-    upstream_blocked <- cand > 1L &&
-        isTRUE(stages[[cand - 1L]]$share_blocked > 0.25)
-    if (downstream_starved || upstream_blocked) {
-        cand
+    list(
+        work = .pump_pad_column(work),
+        out = .pump_pad_column(out),
+        done = .pump_pad_column(done)
+    )
+}
+
+# --- Per-section renderers. Each returns a character vector of lines. -------
+
+# Flat status for a bare source (no stages).
+.pump_render_flat <- function(x, header, theme) {
+    dim_ <- function(txt) .pump_style(txt, "dim", theme)
+    c(
+        .pump_style(header, "bold", theme),
+        paste0("  ", dim_("pulled:"), "  ", x$completed),
+        paste0("  ", dim_("errors:"), "  ", x$errors),
+        paste0(
+            "  ", dim_("pops:"), "    ",
+            x$pop_hits, " hits, ", x$pop_misses, " misses"
+        )
+    )
+}
+
+# Header line: class name plus the total beat count across all stages.
+.pump_render_header <- function(stages, header, theme) {
+    total_beats <- sum(vapply(stages, function(s) s$beats, integer(1)))
+    label <- if (total_beats > 0) {
+        paste0("<", header, " (", total_beats, ")>")
     } else {
-        NA_integer_
+        paste0("<", header, ">")
     }
+    .pump_style(label, "header", theme)
+}
+
+# Source line (top of the frame): position/length and an error chip if any.
+.pump_render_source <- function(source, ctx) {
+    if (is.null(source)) {
+        return(character(0))
+    }
+    theme <- ctx$theme
+    line <- paste0(
+        .pump_style(ctx$g[["top"]], "dim", theme), " ",
+        .pump_style("source", "source", theme),
+        "   ", source$position, "/", .pump_fmt_len(source$length)
+    )
+    if (source$errors > 0) {
+        line <- paste0(line, "   ", .pump_err_chip(source$errors, theme))
+    }
+    line
+}
+
+# One stage: label row, worker/buffer/done + error row, an optional timing and
+# beat-share row, and an optional stuck-job warning.
+.pump_render_stage <- function(s, i, ctx) {
+    theme <- ctx$theme
+    g <- ctx$g
+    pipe <- .pump_style(g[["pipe"]], "dim", theme)
+
+    glyph <- if (!ctx$has_source && i == 1L) g[["top"]] else g[["mid"]]
+    label <- .pump_metric(sprintf("stage %d", i),
+                          .pump_style(s$type, "backend", theme),
+                          theme, style = "stage")
+    if (!is.na(ctx$bottleneck) && i == ctx$bottleneck) {
+        label <- paste0(label, "  ",
+                        .pump_style("* bottleneck", "bottleneck", theme))
+    }
+
+    lines <- c(
+        paste0(.pump_style(glyph, "dim", theme), " ", label),
+        paste0(
+            pipe, "    ",
+            ctx$cols$work[i], "   ",
+            ctx$cols$out[i], "   ",
+            ctx$cols$done[i], "   ",
+            .pump_err_chip(s$errors, theme)
+        )
+    )
+
+    if (isTRUE(s$beats > 0L)) {
+        lines <- c(lines, paste0(
+            pipe, "    ",
+            .pump_metric("fn", paste0(
+                .pump_fmt_ms(s$fn_per_item),
+                .pump_style("/it", "fn", theme)
+            ), theme), "   ",
+            .pump_metric("crd", paste0(
+                .pump_fmt_ms(s$coord_time / s$beats),
+                .pump_style("/bt", "crd", theme)
+            ), theme), "   ",
+            .pump_share_metric(s$share_working, "wrk_share", "wrk", theme), " ",
+            .pump_share_metric(s$share_starved, "stv", "stv", theme), " ",
+            .pump_share_metric(s$share_blocked, "blk", "blk", theme)
+        ))
+    }
+
+    c(lines, .pump_render_stuck(s, pipe, theme))
+}
+
+# Stuck-job tell: an in-flight item much older than the average per-item time
+# deserves attention. Item ages are stamped by pump_status() at snapshot time
+# (in_flight$age_secs), so this is a pure function of the snapshot.
+.pump_render_stuck <- function(s, pipe, theme) {
+    if (length(s$in_flight) == 0 || !isTRUE(s$fn_per_item > 0)) {
+        return(character(0))
+    }
+    ages <- vapply(s$in_flight, function(fl) fl$age_secs, numeric(1))
+    oldest <- which.max(ages)
+    if (ages[oldest] * 1000 > .pump_stuck_factor * s$fn_per_item &&
+            ages[oldest] > .pump_stuck_floor_secs) {
+        paste0(
+            pipe, "    ",
+            .pump_style(sprintf(
+                "oldest in flight: %.1fs (id %s)",
+                ages[oldest], format(s$in_flight[[oldest]]$id)
+            ), "yellow", theme)
+        )
+    } else {
+        character(0)
+    }
+}
+
+# Sink line (bottom of the frame): items that left the pipeline.
+.pump_render_sink <- function(x, ctx) {
+    theme <- ctx$theme
+    total <- if (!is.null(x$source)) {
+        paste0("/", .pump_fmt_len(x$source$length))
+    } else {
+        ""
+    }
+    paste0(
+        .pump_style(ctx$g[["bot"]], "dim", theme), " ",
+        .pump_style("sink", "sink", theme), "   ",
+        x$delivered, total
+    )
 }
 
 #' Format a pipeline status snapshot
@@ -217,168 +413,32 @@ format.pump_status <- function(x, ...,
                                header = "pump_status",
                                color = .pump_use_color(),
                                unicode = .pump_use_unicode()) {
-    dim_ <- function(txt) .pump_style(txt, "dim", color)
-
-    # Flat source status (no stages)
+    # Resolve the color theme once, then hand it (and the per-render context) to
+    # the section renderers. A NULL $stages means a bare source.
+    theme <- .pump_theme(color)
     if (is.null(x$stages)) {
-        lines <- c(
-            .pump_style(header, "bold", color),
-            paste0("  ", dim_("pulled:"), "  ", x$completed %||% 0L),
-            paste0("  ", dim_("errors:"), "  ", x$errors %||% 0L),
-            paste0(
-                "  ", dim_("pops:"), "    ",
-                x$pop_hits %||% 0L, " hits, ", x$pop_misses %||% 0L, " misses"
-            )
-        )
-        return(lines)
-    }
-
-    g <- if (unicode) {
-        # box-drawing glyphs as \u escapes to keep the source ASCII-only
-        c(
-            top = "\u250c\u2500", mid = "\u251c\u2500",
-            pipe = "\u2502", bot = "\u2514\u2500"
-        )
-    } else {
-        c(top = "+-", mid = "+-", pipe = "|", bot = "+-")
+        return(.pump_render_flat(x, header, theme))
     }
 
     stages <- x$stages
-    bottleneck <- .pump_find_bottleneck(stages)
-    
-    # Calculate total beats across all stages for header
-    total_beats <- if (length(stages) > 0) {
-        sum(vapply(stages, function(s) s$beats %||% 0L, integer(1)))
-    } else {
-        0L
-    }
-    
-    # Build header with class and beats
-    if (total_beats > 0) {
-        header_with_beats <- paste0("<", header, " (", total_beats, ")>")
-    } else {
-        header_with_beats <- paste0("<", header, ">")
-    }
-    lines <- .pump_style(header_with_beats, "header", color)
-
-    # --- source (top of the frame) ---
-    if (!is.null(x$source)) {
-        s <- x$source
-        src_line <- paste0(
-            dim_(g[["top"]]), " ", .pump_style("source", "source", color),
-            "   ", s$position, "/", .pump_fmt_len(s$length)
-        )
-        if (s$errors > 0) {
-            src_line <- paste0(
-                src_line, "   ", .pump_style(sprintf("e %d", s$errors), "red", color)
-            )
-        }
-        lines <- c(lines, src_line)
-    }
-
-    # --- stages: build the occupancy segments first so they can be padded
-    # to aligned columns (padding is ANSI-aware) ---
-    seg_work <- character(length(stages))
-    seg_out <- character(length(stages))
-    seg_done <- character(length(stages))
-    for (i in seq_along(stages)) {
-        s <- stages[[i]]
-        buffer_full <- s$buffer_capacity > 0L && s$buffer_size >= s$buffer_capacity
-        seg_work[i] <- paste0(
-            .pump_style("wrk", "wrk", color), " ",
-            .pump_bar(s$workers_active, s$workers_limit, color),
-            " ", s$workers_active, "/", s$workers_limit
-        )
-        seg_out[i] <- paste0(
-            .pump_style("buf", "buf", color), " ",
-            .pump_bar(
-                s$buffer_size, s$buffer_capacity, color,
-                fill_style = if (buffer_full) "red" else "green"
-            ),
-            " ", s$buffer_size, "/", s$buffer_capacity
-        )
-        seg_done[i] <- paste0(.pump_style("done", "done", color), " ", s$completed)
-    }
-    w_work <- max(vapply(seg_work, .pump_visible_width, integer(1)))
-    w_out <- max(vapply(seg_out, .pump_visible_width, integer(1)))
-    w_done <- max(vapply(seg_done, .pump_visible_width, integer(1)))
-
-    for (i in seq_along(stages)) {
-        s <- stages[[i]]
-        is_bottleneck <- !is.na(bottleneck) && i == bottleneck
-
-        glyph <- if (is.null(x$source) && i == 1L) g[["top"]] else g[["mid"]]
-        label <- sprintf("stage %d", i)
-        if (is_bottleneck) {
-            label <- paste0(
-                .pump_style(label, "stage", color), " ", .pump_style(s$type, "backend", color), "  ",
-                .pump_style("* bottleneck", "bottleneck", color)
-            )
-        } else {
-            label <- paste0(.pump_style(label, "stage", color), " ", .pump_style(s$type, "backend", color))
-        }
-        lines <- c(lines, paste0(dim_(glyph), " ", label))
-
-        err_txt <- if (s$errors > 0) {
-            .pump_style(sprintf("err %d", s$errors), "bright_red", color)
-        } else {
-            .pump_style("err 0", "err", color)
-        }
-        lines <- c(lines, paste0(
-            dim_(g[["pipe"]]), "    ",
-            .pump_pad_to(seg_work[i], w_work), "   ",
-            .pump_pad_to(seg_out[i], w_out), "   ",
-            .pump_pad_to(seg_done[i], w_done), "   ",
-            err_txt
-        ))
-
-        if (isTRUE(s$beats > 0L)) {
-            share_txt <- function(share, style, name) {
-                val <- .pump_fmt_share(share)
-                val <- if (isTRUE(share > 0)) {
-                    .pump_style(val, style, color)
-                } else {
-                    .pump_style(val, "dim", color)
-                }
-                paste0(.pump_style(name, name, color), " ", val)
-            }
-            lines <- c(lines, paste0(
-                dim_(g[["pipe"]]), "    ",
-                .pump_style("fn", "fn", color), " ", .pump_fmt_ms(s$fn_per_item), .pump_style("/it", "fn", color), "   ",
-                .pump_style("crd", "crd", color), " ", .pump_fmt_ms(s$coord_time / s$beats), .pump_style("/bt", "crd", color), "   ",
-                share_txt(s$share_working, "wrk_share", "wrk"), " ",
-                share_txt(s$share_starved, "stv", "stv"), " ",
-                share_txt(s$share_blocked, "blk", "blk")
-            ))
-        }
-
-        # Stuck-job tell: an in-flight item much older than the average
-        # per-item time deserves attention
-        if (length(s$in_flight) > 0 && isTRUE(s$fn_per_item > 0)) {
-            ages <- vapply(s$in_flight, function(fl) {
-                as.numeric(difftime(Sys.time(), fl$since, units = "secs"))
-            }, numeric(1))
-            oldest <- which.max(ages)
-            if (ages[oldest] * 1000 > 10 * s$fn_per_item && ages[oldest] > 1) {
-                lines <- c(lines, paste0(
-                    dim_(g[["pipe"]]), "    ",
-                    .pump_style(sprintf(
-                        "oldest in flight: %.1fs (id %s)",
-                        ages[oldest], format(s$in_flight[[oldest]]$id)
-                    ), "yellow", color)
-                ))
-            }
-        }
-    }
-
-    # --- sink (bottom of the frame): items that left the pipeline ---
-    total <- if (!is.null(x$source)) .pump_fmt_len(x$source$length) else NULL
-    sink_line <- paste0(
-        dim_(g[["bot"]]), " ", .pump_style("sink", "sink", color), "   ",
-        x$delivered %||% 0L,
-        if (!is.null(total)) paste0("/", total) else ""
+    ctx <- list(
+        theme = theme,
+        g = if (isTRUE(unicode)) .pump_glyphs_unicode else .pump_glyphs_ascii,
+        bottleneck = .pump_find_bottleneck(stages),
+        has_source = !is.null(x$source),
+        cols = .pump_stage_columns(stages, theme)
     )
-    c(lines, sink_line)
+
+    c(
+        .pump_render_header(stages, header, theme),
+        .pump_render_source(x$source, ctx),
+        unlist(
+            lapply(seq_along(stages),
+                   function(i) .pump_render_stage(stages[[i]], i, ctx)),
+            use.names = FALSE
+        ),
+        .pump_render_sink(x, ctx)
+    )
 }
 
 #' @title Print a pump_status object
@@ -414,60 +474,8 @@ format.pump <- function(x, ...) {
 #' The header shows the class name followed by the total number of beats
 #' (pipeline scheduling cycles) in parentheses, e.g., `<pump (10)>`.
 #'
-#' @section Legend:
-#' Compressed labels used in the output:
-#' \describe{
-#'   \item{wrk}{workers (active/limit)}
-#'   \item{buf}{output buffer (size/capacity)}
-#'   \item{done}{completed items}
-#'   \item{err}{errors}
-#'   \item{fn}{function time per item}
-#'   \item{crd}{coordination time per beat}
-#'   \item{wrk/stv/blk}{working/starved/blocked beat shares}
-#' }
-#'
-#' @section Customization:
-#' Colors can be customized via `options(siphon.colors = list(...))` to override
-#' specific elements. The system uses standard 16-color ANSI codes:
-#' \describe{
-#'   \item{bold = "1"}{bold text}
-#'   \item{dim = "2"}{dimmed text}
-#'   \item{blue = "34"}{primary color}
-#'   \item{green = "32"}{success}
-#'   \item{yellow = "33"}{warning}
-#'   \item{red = "31"}{error}
-#'   \item{bright_blue = "94"}{bright primary}
-#'   \item{bright_green = "92"}{bright success}
-#'   \item{bright_yellow = "93"}{bright warning}
-#'   \item{bright_red = "91"}{bright error}
-#' }
-#' 
-#' Element-specific color names:
-#' \describe{
-#'   \item{header}{pipeline header text}
-#'   \item{source}{"source" label}
-#'   \item{sink}{"sink" label}
-#'   \item{stage}{stage number (e.g., "stage 1")}
-#'   \item{backend}{backend name (e.g., "main", "mirai")}
-#'   \item{wrk}{workers label}
-#'   \item{buf}{buffer label}
-#'   \item{done}{completed label}
-#'   \item{err}{errors label}
-#'   \item{fn}{function time label}
-#'   \item{crd}{coordination time label}
-#'   \item{beat}{beats label}
-#'   \item{wrk_share}{working share label}
-#'   \item{stv}{starved share label}
-#'   \item{blk}{blocked share label}
-#'   \item{bottleneck}{bottleneck marker}
-#' }
-#' 
-#' Examples:
-#' \code{options(siphon.colors = list(stage = "96"))} to make stage names cyan
-#' \code{options(siphon.colors = list(wrk = "1;34"))} to make workers label bold blue
-#' \code{options(siphon.colors = list(bright_red = "35"))} to change error color to purple
-#' 
-#' To disable colors globally, set `options(siphon.color = FALSE)`.
+#' @inheritSection pump_status Legend
+#' @inheritSection pump_status Customization
 #'
 #' @param x A pump object.
 #' @param ... Unused.
