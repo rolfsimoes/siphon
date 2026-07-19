@@ -75,6 +75,21 @@ mirai_backend <- function() {
     list(key = key)
 }
 #' @export
+.pump_executor_unregister.pump_mirai_backend <- function(backend, handle) {
+    # Daemons are long-lived: uninstall the runner so pools do not
+    # accumulate one runner per stage per run. Fire-and-forget: results
+    # are not collected, and a daemon that went away is not an
+    # unregistration failure.
+    try(
+        mirai::everywhere(
+            suppressWarnings(rm(list = key, envir = globalenv())),
+            .args = list(key = handle$key)
+        ),
+        silent = TRUE
+    )
+    invisible(backend)
+}
+#' @export
 .pump_executor_new_job.pump_mirai_backend <- function(backend, handle, data) {
     key <- handle$key
     m <- mirai::mirai(
