@@ -136,6 +136,9 @@
             beats_blocked <<- 0L
             pop_hits <<- 0L
             pop_misses <<- 0L
+            # errors lives in the same snapshot, so reset it too - otherwise
+            # reset_stats() and snapshot() disagree about what "stats" mean (F6)
+            errors <<- 0L
             fn_time <<- 0.0
             tick_time <<- 0.0
             submit_time <<- 0.0
@@ -144,6 +147,55 @@
             last_beat_at <<- NA_real_
             invisible(NULL)
         }
+    )
+}
+
+# Single source of truth for the ~22-member "pump" protocol. Every stage and
+# source is a bare list of closures with class "pump"; this constructor fills
+# in safe defaults for every member so each real constructor spells out only
+# its distinctive ones, and it stamps an explicit role tag ("stage" or
+# "source"). pump_status() switches on that tag instead of sniffing NULL
+# buffers, which is what previously misreported an empty-stage pipeline as a
+# bare source. Members that cannot sensibly default - the two-phase beat
+# protocol, and a stage's upstream link - default to stop() so a forgotten
+# implementation is loud rather than a silent no-op. Sources never carry the
+# error-policy or upstream members, so those defaults are added only for the
+# "stage" role (preserving the is.function() guards in run.R and the driver).
+.pump_protocol <- function(overrides, role = c("stage", "source")) {
+    role <- match.arg(role)
+    not_impl <- function(what) {
+        function(...) stop("pump protocol: ", what, " not implemented")
+    }
+    defaults <- list(
+        next_item = not_impl("next_item()"),
+        pop_item = not_impl("pop_item()"),
+        length = function() Inf,
+        pipeline_length = function() Inf,
+        buffer = function() NULL,
+        slots = function() NULL,
+        progress = function() 0L,
+        stage_completed = function() 0L,
+        errors = function() 0L,
+        stats = function() list(),
+        reset_stats = function() invisible(NULL),
+        set_backend = function(value) invisible(NULL),
+        get_backend = function() "main",
+        item_commit = function(id, data) invisible(NULL),
+        item_abort = function(id, error = NULL, data = NULL) invisible(NULL),
+        item_release = function(id) invisible(NULL),
+        done = function() TRUE,
+        close = function() invisible(NULL),
+        backend = function() main_backend()
+    )
+    if (role == "stage") {
+        defaults$set_on_error <- function(default) invisible(NULL)
+        defaults$get_on_error <- function() "stop"
+        defaults$upstream <- not_impl("upstream()")
+    }
+    structure(
+        utils::modifyList(defaults, overrides),
+        class = "pump",
+        role = role
     )
 }
 
@@ -169,15 +221,12 @@
         explicit = explicit_backend, upstream = upstream
     )
 
-    structure(list(
+    .pump_protocol(list(
         next_item = function() invisible("done"),
         pop_item = function() invisible(NULL),
         length = function() 0L,
         pipeline_length = function() upstream$pipeline_length(),
-        buffer = function() invisible(NULL),
-        slots = function() invisible(NULL),
         progress = function() upstream$progress(),
-        stage_completed = function() 0L,
         errors = function() stats$errors(),
         stats = function() stats$snapshot(),
         reset_stats = function() stats$reset(),
@@ -194,11 +243,10 @@
         item_release = function(id) {
             upstream$item_release(id)
         },
-        done = function() TRUE,
         close = function() if (is.function(upstream$close)) upstream$close(),
         backend = function() .pump_resolve_backend(backend_policy$get()),
         upstream = function() upstream
-    ), class = "pump")
+    ), role = "stage")
 }
 
 # Internal constructor for pump stage objects
@@ -355,7 +403,14 @@
                 break
             }
             if (msg$ok) {
-                if (is.null(submit_job(msg))) break
+                # submit_job() returns NULL only if slot acquisition failed,
+                # which the sl$n_free() > 0L guard makes unreachable. Fail
+                # loudly rather than silently drop the pulled msg without an
+                # item_abort/item_release (an invisible leak for managed
+                # sources) should protocol drift ever make it reachable (F8).
+                if (is.null(submit_job(msg))) {
+                    stop("Internal error: no free slot after n_free() > 0")
+                }
             } else {
                 deliver(msg)
             }
@@ -447,7 +502,7 @@
         upstream = function() upstream
     )
 
-    structure(self, class = "pump")
+    .pump_protocol(self, role = "stage")
 }
 
 #' Add a processing stage to a pipeline

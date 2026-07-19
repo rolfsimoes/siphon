@@ -70,7 +70,7 @@
     pull_time <- 0.0
 
     # public methods
-    self <- list(
+    .pump_protocol(list(
         next_item = function() invisible(NULL),
         pop_item = function() {
             t0 <- .pump_now_ms()
@@ -93,8 +93,6 @@
         },
         length = function() n,
         pipeline_length = function() n,
-        buffer = function() invisible(NULL),
-        slots = function() invisible(NULL),
         progress = function() i,
         stage_completed = function() i,
         errors = function() get_err_count(),
@@ -111,19 +109,12 @@
             pull_time <<- 0.0
         },
         done = function() i == n,
-        close = function() invisible(NULL),
-        item_commit = function(id, data) invisible(NULL),
-        item_abort = function(id, error = NULL, data = NULL) invisible(NULL),
-        item_release = function(id) invisible(NULL),
-        backend = function() main_backend(),
         set_backend = function(value) {
             default_backend <<- value
             invisible(NULL)
         },
         get_backend = function() default_backend
-    )
-
-    structure(self, class = "pump")
+    ), role = "source")
 }
 
 #' Create a custom siphon source
@@ -256,16 +247,11 @@ pump_source <- function(pull_fn,
         msg
     }
 
-    self <- list(
+    .pump_protocol(list(
         next_item = function() invisible(NULL),
         pop_item = wrapped_pull_fn,
         length = length_fn,
         pipeline_length = length_fn,
-        buffer = function() invisible(NULL),
-        slots = function() invisible(NULL),
-        progress = function() 0L,
-        stage_completed = function() 0L,
-        errors = function() 0L,
         stats = function() {
             list(
                 pop_hits = pop_hits,
@@ -283,17 +269,26 @@ pump_source <- function(pull_fn,
         item_commit = item_commit_resolved,
         item_abort = item_abort_resolved,
         item_release = item_release_resolved,
-        backend = function() main_backend(),
         set_backend = function(value) {
             default_backend <<- value
             invisible(NULL)
         },
         get_backend = function() default_backend
-    )
-    structure(self, class = "pump")
+    ), role = "source")
 }
 
+#' Number of items in a pump pipeline
+#'
+#' Returns the item count of the pipeline's source. Infinite sources (the
+#' default for [pump_source()]) report `NA_integer_` rather than `Inf`, because
+#' base R's `length()` contract requires a non-negative integer and an `Inf`
+#' would break callers such as `seq_len(length(x))`. Internal code that needs
+#' the raw count (including `Inf`) reads `x$length()` directly.
+#'
+#' @param x A pump object.
+#' @return A non-negative integer, or `NA_integer_` for an infinite source.
 #' @export
 length.pump <- function(x) {
-    x$length()
+    n <- x$length()
+    if (is.finite(n)) as.integer(n) else NA_integer_
 }
