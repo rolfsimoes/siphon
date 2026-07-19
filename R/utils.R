@@ -16,6 +16,21 @@
     sprintf(".siphon_stage_%d_%d", Sys.getpid(), n)
 }
 
+# How long .pump_backend_quiesce() waits for in-flight jobs to deliver
+# their results before giving a node up, in seconds
+.pump_quiesce_timeout <- function() {
+    timeout <- getOption("siphon.quiesce_timeout", 30)
+    if (!is.numeric(timeout) || length(timeout) != 1L ||
+            is.na(timeout) || timeout < 0) {
+        stop(
+            "options(siphon.quiesce_timeout =) must be a non-negative ",
+            "number of seconds.",
+            call. = FALSE
+        )
+    }
+    timeout
+}
+
 # Human-readable backend name for status and print output
 .pump_backend_name <- function(backend) {
     backend$name %||% "unknown"

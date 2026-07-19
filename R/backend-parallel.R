@@ -265,6 +265,55 @@ parallel_backend <- function(workers = NULL,
     invisible(backend)
 }
 
+#' @export
+.pump_backend_quiesce.pump_parallel_backend <- function(backend) {
+    state <- backend$state
+    if (is.null(state$cl) || !any(state$busy)) {
+        return(invisible(backend))
+    }
+
+    recv_result <- get("recvResult", envir = asNamespace("parallel"))
+    deadline <- .pump_now_ms() + .pump_quiesce_timeout() * 1000
+
+    for (worker_id in which(state$busy)) {
+        node <- state$cl[[worker_id]]
+        budget <- max(0, (deadline - .pump_now_ms()) / 1000)
+        # Drain the pending result and discard it. drained is FALSE when
+        # the job is still running at the deadline, NA when the node is
+        # dead (connection error).
+        drained <- tryCatch(
+            {
+                if (socketSelect(list(node$con), write = FALSE,
+                                 timeout = budget)) {
+                    recv_result(node)
+                    TRUE
+                } else {
+                    FALSE
+                }
+            },
+            error = function(e) NA
+        )
+        if (isTRUE(drained)) {
+            state$busy[worker_id] <- FALSE
+        } else if (isTRUE(backend$owned)) {
+            # A timed-out or dead node of an owned pool is replaced so the
+            # backend always comes out of an abort at full capacity.
+            tryCatch(
+                {
+                    .parallel_recover_worker(backend, worker_id)
+                    state$busy[worker_id] <- FALSE
+                },
+                error = function(e) NULL
+            )
+        }
+        # On an attached cluster an undrained node stays busy
+        # (quarantined): siphon must not replace nodes it does not own.
+        # The owner can find it with parallel_busy() and repair it.
+    }
+
+    invisible(backend)
+}
+
 #' Run setup code on all workers of a parallel backend
 #'
 #' `parallel_setup_workers()` evaluates an expression in the global
@@ -439,6 +488,50 @@ parallel_stop <- function(backend, force = FALSE) {
     .pump_backend_close(backend, force = force)
 
     invisible(backend)
+}
+
+#' Inspect the workers of a parallel backend
+#'
+#' `parallel_workers()` returns the number of worker processes of a
+#' parallel backend. `parallel_busy()` returns a logical vector with one
+#' element per worker: `TRUE` for workers currently holding an in-flight
+#' job. Owners of attached clusters (see `parallel_backend(cluster =)`)
+#' can use `parallel_busy()` after a failed run to find nodes that were
+#' quarantined (left busy) and repair them before reusing the cluster
+#' elsewhere.
+#'
+#' @details A backend created with `workers` is a specification until its
+#'   first use: `parallel_workers()` then reports the configured capacity
+#'   and `parallel_busy()` returns a zero-length vector. On a stopped
+#'   backend, `parallel_workers()` returns 0 and `parallel_busy()` a
+#'   zero-length vector.
+#'
+#' @param backend A backend object created by [parallel_backend()].
+#' @return `parallel_workers()`: an integer count. `parallel_busy()`: a
+#'   logical vector with one element per live worker.
+#' @seealso [parallel_backend()], [parallel_stop()]
+#' @examples
+#' if (requireNamespace("parallel", quietly = TRUE)) {
+#'     bk <- parallel_backend(2)
+#'     parallel_workers(bk)
+#'     parallel_busy(bk)
+#'     parallel_stop(bk)
+#' }
+#' @export
+parallel_workers <- function(backend) {
+    if (!inherits(backend, "pump_parallel_backend")) {
+        stop("backend must be a parallel backend.", call. = FALSE)
+    }
+    .pump_executor_count(backend)
+}
+
+#' @rdname parallel_workers
+#' @export
+parallel_busy <- function(backend) {
+    if (!inherits(backend, "pump_parallel_backend")) {
+        stop("backend must be a parallel backend.", call. = FALSE)
+    }
+    backend$state$busy
 }
 
 # --- .parallel_* S3 implementation ---
@@ -825,6 +918,41 @@ parallel_stop <- function(backend, force = FALSE) {
     state$setup_exprs[[length(state$setup_exprs) + 1L]] <- install_expr
 
     list(key = key)
+}
+#' @export
+.pump_executor_unregister.pump_parallel_backend <- function(backend,
+                                                            handle) {
+    state <- backend$state
+    key <- handle$key
+
+    # Forget the recorded install expression first, so replacement nodes
+    # and future opens of an owned specification never replay it.
+    is_install <- vapply(
+        state$setup_exprs,
+        function(e) {
+            is.call(e) && identical(e[[1L]], as.name("assign")) &&
+                identical(e[[2L]], key)
+        },
+        logical(1L)
+    )
+    state$setup_exprs <- state$setup_exprs[!is_install]
+
+    if (is.null(state$cl)) {
+        return(invisible(backend))
+    }
+
+    # Remove the runner from free nodes only: a busy node would answer the
+    # removal message only after its in-flight job, blocking collection.
+    # Busy nodes here are quarantined leftovers of a failed run; they keep
+    # a stale runner until the node is replaced (harmless: keys are never
+    # reused within a session).
+    free <- state$cl[!state$busy]
+    expr <- bquote(
+        suppressWarnings(rm(list = .(key), envir = globalenv()))
+    )
+    try(.parallel_broadcast_expr(free, expr, collect = FALSE), silent = TRUE)
+
+    invisible(backend)
 }
 #' @export
 .pump_executor_new_job.pump_parallel_backend <- function(backend,

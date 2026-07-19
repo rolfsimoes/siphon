@@ -491,7 +491,20 @@
             upstream$done() && buf$size() == 0L &&
                 (is.null(sl) || sl$active() == 0L)
         },
-        close = function() if (is.function(upstream$close)) upstream$close(),
+        close = function() {
+            # Uninstall this stage's runner from persistent workers; the
+            # reset lets a re-driven pipeline (daemon-style pump_drain)
+            # re-register on its next beat.
+            if (opened) {
+                try(
+                    .pump_executor_unregister(exec_backend, stage_handle),
+                    silent = TRUE
+                )
+                stage_handle <<- NULL
+                opened <<- FALSE
+            }
+            if (is.function(upstream$close)) upstream$close()
+        },
         backend = function() {
             if (!is.null(exec_backend)) {
                 exec_backend

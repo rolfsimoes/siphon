@@ -68,6 +68,19 @@
 .pump_executor_register <- function(backend, func, args) {
     UseMethod(".pump_executor_register")
 }
+# Called by a stage's close() with the handle returned by
+# .pump_executor_register(): removes the stage's static payload from
+# wherever the backend keeps it. Backends whose workers outlive the
+# pipeline (parallel, mirai) clean up here so long-lived pools do not
+# accumulate one runner per stage per run; the default is a no-op for
+# backends without persistent per-stage state.
+.pump_executor_unregister <- function(backend, handle) {
+    UseMethod(".pump_executor_unregister")
+}
+#' @export
+.pump_executor_unregister.pump_backend <- function(backend, handle) {
+    invisible(backend)
+}
 .pump_executor_new_job <- function(backend, handle, data) {
     UseMethod(".pump_executor_new_job")
 }
@@ -93,6 +106,21 @@
 }
 #' @export
 .pump_backend_close.pump_backend <- function(backend, ...) {
+    invisible(backend)
+}
+
+# Called by the run driver when a pipeline aborts with jobs possibly still
+# in flight. Backends whose workers outlive the run and deliver results
+# over shared channels (parallel sockets) must drain pending results here:
+# an orphaned result left in a socket is read as the answer to whatever is
+# submitted next on that node — silent cross-run corruption, worst on
+# attached clusters where the next submitter may not even be siphon. The
+# default is a no-op for backends without that failure mode.
+.pump_backend_quiesce <- function(backend) {
+    UseMethod(".pump_backend_quiesce")
+}
+#' @export
+.pump_backend_quiesce.pump_backend <- function(backend) {
     invisible(backend)
 }
 

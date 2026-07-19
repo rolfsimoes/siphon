@@ -28,6 +28,11 @@
                         timeout,
                         error_on_exhausted) {
     if (!inherits(x, "pump")) x <- .pump_source_basic(x)
+    # On abort, quiesce backends before the stages close: draining frees
+    # the nodes, so the close-time unregister broadcast reaches them
+    # instead of skipping nodes still marked busy.
+    completed <- FALSE
+    on.exit(if (!completed) .pump_drive_quiesce(x), add = TRUE)
     on.exit(if (is.function(x$close)) x$close(), add = TRUE)
 
     if (x$done()) {
@@ -36,6 +41,7 @@
         if (error_on_exhausted && x$length() != 0L) {
             stop("source pipeline is exhausted")
         }
+        completed <- TRUE
         return(invisible(NULL))
     }
 
@@ -99,7 +105,28 @@
     if (progress) {
         utils::setTxtProgressBar(pb, x$pipeline_length())
     }
+    completed <- TRUE
 
+    invisible(NULL)
+}
+
+# Quiesce every backend of an aborted pipeline. Walks the stages itself
+# (rather than reusing .pump_pipeline_backends()) so a stage whose
+# inherited backend never resolved cannot abort the walk: each stage is
+# handled independently and quiesce failures never mask the original
+# error.
+.pump_drive_quiesce <- function(x) {
+    current <- x
+    while (inherits(current, "pump")) {
+        if (is.function(current$backend)) {
+            bk <- tryCatch(current$backend(), error = function(e) NULL)
+            if (!is.null(bk)) {
+                try(.pump_backend_quiesce(bk), silent = TRUE)
+            }
+        }
+        if (!is.function(current$upstream)) break
+        current <- current$upstream()
+    }
     invisible(NULL)
 }
 
