@@ -37,16 +37,20 @@
 #'   * `throughput` - completed items per second over the observed beat span
 #'     (`NA` until two beats have happened; the span includes any pauses
 #'     between interactive calls).
-#'   * `in_flight` - one entry per active slot: `id`, `idx`, and `since`
-#'     (submission time) of the item currently being processed.
+#'   * `in_flight` - one entry per active slot: `id`, `idx`, `since`
+#'     (submission time), and `age_secs` (seconds in flight at snapshot time)
+#'     of the item currently being processed.
 #'   * `buffered_ids` - ids of the first few items ready in the buffer.
 #'
 #'   For plain sources the result is flat and reports `completed`, `errors`,
 #'   `pop_hits`, `pop_misses`, and `pull_time` (ms inside `pop_item()`).
-#'   For pipelines, the last stage's fields are also copied to the top level
-#'   for convenience, plus `delivered` - the number of items that left the
-#'   pipeline (popped from the terminal stage by `pump_run()`, `pump_pop()`,
-#'   or `pop_item()`); shown as the sink in `print()`.
+#'   For pipelines, the result also carries `delivered` - the number of items
+#'   that left the pipeline (popped from the terminal stage by `pump_run()`,
+#'   `pump_pop()`, or `pop_item()`); shown as the sink in `print()`.
+#'
+#'   For pipelines, the terminal stage's scalar fields are additionally copied
+#'   to the top level. **This flat copy is deprecated** and will be removed in
+#'   a future minor release; read per-stage values from `x$stages` instead.
 #'
 #' @details Durations are accumulated only inside `next_item()`/`pop_item()`
 #'   calls: time between beats (interactive pauses, `sleep_ms` backoff in
@@ -139,6 +143,50 @@ pump_status <- function(x) {
     UseMethod("pump_status")
 }
 
+# Number of ready buffer ids surfaced in a stage's status snapshot.
+.pump_status_peek <- 8L
+
+# Bottleneck heuristic (see .pump_find_bottleneck): a stage needs at least this
+# many beats to be considered, must be working at least this share of the time,
+# and a neighbor must corroborate above the neighbor share.
+.pump_bottleneck_min_beats <- 5L
+.pump_bottleneck_min_share <- 0.5
+.pump_bottleneck_neighbor <- 0.25
+
+# Pick the bottleneck stage index, or NA when there is no clear signal. This is
+# analysis over the snapshot (not rendering): the stage with the highest
+# working share, provided it has seen enough beats to be meaningful, is working
+# most of the time, and its neighbors corroborate (downstream starving, or
+# upstream blocked behind it).
+.pump_find_bottleneck <- function(stages) {
+    n <- length(stages)
+    if (n < 2L) {
+        return(NA_integer_)
+    }
+    shares <- vapply(stages, function(s) {
+        if (isTRUE(s$beats >= .pump_bottleneck_min_beats) &&
+                is.finite(s$share_working)) {
+            s$share_working
+        } else {
+            -Inf
+        }
+    }, numeric(1))
+    cand <- which.max(shares)
+    if (!is.finite(shares[cand]) || shares[cand] < .pump_bottleneck_min_share) {
+        return(NA_integer_)
+    }
+    corroborates <- .pump_bottleneck_neighbor
+    downstream_starved <- cand < n &&
+        isTRUE(stages[[cand + 1L]]$share_starved > corroborates)
+    upstream_blocked <- cand > 1L &&
+        isTRUE(stages[[cand - 1L]]$share_blocked > corroborates)
+    if (downstream_starved || upstream_blocked) {
+        cand
+    } else {
+        NA_integer_
+    }
+}
+
 # Derived per-stage metrics computed from a stats snapshot
 .pump_stage_derived <- function(snap, completed) {
     span_s <- if (!is.na(snap$first_beat_at) && !is.na(snap$last_beat_at)) {
@@ -178,11 +226,10 @@ pump_status <- function(x) {
 
 #' @export
 pump_status.pump <- function(x) {
-    buf <- x$buffer()
-    sl <- x$slots()
-
-    # Check if this is a source (no slots/buffer)
-    is_source <- is.null(buf) && is.null(sl)
+    # Detect source vs stage by the explicit role tag, not by sniffing NULL
+    # buffers/slots: an empty stage also has neither, and used to be
+    # misreported here as a bare source (F4).
+    is_source <- identical(attr(x, "role"), "source")
 
     if (is_source) {
         snap <- if (is.function(x$stats)) x$stats() else list()
@@ -210,8 +257,8 @@ pump_status.pump <- function(x) {
         buf <- current$buffer()
         sl <- current$slots()
 
-        # Check if this is a source (no slots/buffer)
-        is_current_source <- is.null(buf) && is.null(sl)
+        # Source vs stage by role tag (see the top-level check above).
+        is_current_source <- identical(attr(current, "role"), "source")
 
         if (is_current_source) {
             # This is a source, save it and stop
@@ -231,7 +278,9 @@ pump_status.pump <- function(x) {
         if (!is.null(buf)) {
             buffer_size <- buf$size()
             buffer_capacity <- buf$size() + buf$remaining()
-            buffered_ids <- lapply(buf$peek(8L), function(m) m$id)
+            buffered_ids <- lapply(
+                buf$peek(.pump_status_peek), function(m) m$id
+            )
         } else {
             buffer_size <- 0L
             buffer_capacity <- 0L
@@ -242,6 +291,15 @@ pump_status.pump <- function(x) {
             workers_active <- sl$active()
             workers_limit <- sl$limit()
             in_flight <- if (is.function(sl$inspect)) sl$inspect() else list()
+            # Stamp each in-flight item's age at snapshot time so the renderer
+            # stays a pure function of the snapshot (no Sys.time() at render).
+            now <- Sys.time()
+            in_flight <- lapply(in_flight, function(fl) {
+                fl$age_secs <- as.numeric(
+                    difftime(now, fl$since, units = "secs")
+                )
+                fl
+            })
         } else {
             workers_active <- 0L
             workers_limit <- 0L
@@ -293,8 +351,9 @@ pump_status.pump <- function(x) {
     # Reverse to put upstream stages first
     stages <- rev(stages)
 
-    # For convenience (and backward compatibility), copy the last stage's
-    # scalar fields to the top level
+    # Deprecated: copy the terminal stage's scalar fields to the top level.
+    # Retained for backward compatibility; scheduled for removal in a future
+    # minor release (F6). New code should read from `stages` instead.
     last <- if (length(stages) > 0) stages[[length(stages)]] else NULL
     top_fields <- c(
         "buffer_size", "buffer_capacity", "workers_active", "workers_limit",
