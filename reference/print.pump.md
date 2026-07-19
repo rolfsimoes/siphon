@@ -181,6 +181,5 @@ Element-specific color names:
 Examples: `options(siphon.colors = list(stage = "96"))` to make stage
 names cyan `options(siphon.colors = list(wrk = "1;34"))` to make workers
 label bold blue `options(siphon.colors = list(bright_red = "35"))` to
-change error color to purple
-
-To disable colors globally, set `options(siphon.color = FALSE)`.
+change error color to purple To disable colors globally, set
+`options(siphon.color = FALSE)`.

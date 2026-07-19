@@ -66,20 +66,25 @@ A list of class `pump_status`. For a pipeline it contains `source`
   (`NA` until two beats have happened; the span includes any pauses
   between interactive calls).
 
-- `in_flight` - one entry per active slot: `id`, `idx`, and `since`
-  (submission time) of the item currently being processed.
+- `in_flight` - one entry per active slot: `id`, `idx`, `since`
+  (submission time), and `age_secs` (seconds in flight at snapshot time)
+  of the item currently being processed.
 
 - `buffered_ids` - ids of the first few items ready in the buffer.
 
 For plain sources the result is flat and reports `completed`, `errors`,
 `pop_hits`, `pop_misses`, and `pull_time` (ms inside `pop_item()`). For
-pipelines, the last stage's fields are also copied to the top level for
-convenience, plus `delivered` - the number of items that left the
-pipeline (popped from the terminal stage by
+pipelines, the result also carries `delivered` - the number of items
+that left the pipeline (popped from the terminal stage by
 [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md),
 [`pump_pop()`](https://rolfsimoes.github.io/siphon/reference/pump_pop.md),
 or `pop_item()`); shown as the sink in
 [`print()`](https://rdrr.io/r/base/print.html).
+
+For pipelines, the terminal stage's scalar fields are additionally
+copied to the top level. **This flat copy is deprecated** and will be
+removed in a future minor release; read per-stage values from `x$stages`
+instead.
 
 ## Details
 

@@ -11,7 +11,7 @@ and which stage is the bottleneck."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -94,15 +94,18 @@ shares in <code>[0, 1]</code> (<code>NA</code> before the first beat).</p></li>
 <li><p><code>throughput</code> - completed items per second over the observed beat span
 (<code>NA</code> until two beats have happened; the span includes any pauses
 between interactive calls).</p></li>
-<li><p><code>in_flight</code> - one entry per active slot: <code>id</code>, <code>idx</code>, and <code>since</code>
-(submission time) of the item currently being processed.</p></li>
+<li><p><code>in_flight</code> - one entry per active slot: <code>id</code>, <code>idx</code>, <code>since</code>
+(submission time), and <code>age_secs</code> (seconds in flight at snapshot time)
+of the item currently being processed.</p></li>
 <li><p><code>buffered_ids</code> - ids of the first few items ready in the buffer.</p></li>
 </ul><p>For plain sources the result is flat and reports <code>completed</code>, <code>errors</code>,
 <code>pop_hits</code>, <code>pop_misses</code>, and <code>pull_time</code> (ms inside <code>pop_item()</code>).
-For pipelines, the last stage's fields are also copied to the top level
-for convenience, plus <code>delivered</code> - the number of items that left the
-pipeline (popped from the terminal stage by <code><a href="pump_run.html">pump_run()</a></code>, <code><a href="pump_pop.html">pump_pop()</a></code>,
-or <code>pop_item()</code>); shown as the sink in <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>.</p>
+For pipelines, the result also carries <code>delivered</code> - the number of items
+that left the pipeline (popped from the terminal stage by <code><a href="pump_run.html">pump_run()</a></code>,
+<code><a href="pump_pop.html">pump_pop()</a></code>, or <code>pop_item()</code>); shown as the sink in <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>.</p>
+<p>For pipelines, the terminal stage's scalar fields are additionally copied
+to the top level. <strong>This flat copy is deprecated</strong> and will be removed in
+a future minor release; read per-stage values from <code>x$stages</code> instead.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

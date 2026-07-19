@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,30 @@
       <small>Source: <a href="https://github.com/rolfsimoes/siphon/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="siphon-development-version">siphon (development version)<a class="anchor" aria-label="anchor" href="#siphon-development-version"></a></h2>
+<div class="section level3">
+<h3 id="behavior-changes-development-version">Behavior changes<a class="anchor" aria-label="anchor" href="#behavior-changes-development-version"></a></h3>
+<ul><li>
+<code><a href="https://rdrr.io/r/base/length.html" class="external-link">length()</a></code> on a pump pipeline now returns <code>NA_integer_</code> for infinite sources instead of <code>Inf</code>, matching base R’s requirement that <code><a href="https://rdrr.io/r/base/length.html" class="external-link">length()</a></code> be a non-negative integer. The raw count (still <code>Inf</code>) remains available via <code>x$length()</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="deprecations-development-version">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-development-version"></a></h3>
+<ul><li>The flat top-level copy of the terminal stage’s fields in <code><a href="../reference/pump_status.html">pump_status()</a></code> is deprecated and will be removed in a future minor release. Read per-stage values from <code>x$stages</code> instead.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="fixes-development-version">Fixes<a class="anchor" aria-label="anchor" href="#fixes-development-version"></a></h3>
+<ul><li>
+<code><a href="../reference/pump_status.html">pump_status()</a></code> on a pipeline whose only stage sits over an empty source now reports it as a stage (with its source and sink) instead of misreporting it as a bare source.</li>
+<li>
+<code>reset_stats()</code> now also clears the error count, so it and <code>stats()</code> agree on what a stats snapshot contains.</li>
+<li>An unreachable slot-acquisition failure in the scheduler now raises an internal error instead of silently dropping a pulled item without releasing it.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="internal-development-version">Internal<a class="anchor" aria-label="anchor" href="#internal-development-version"></a></h3>
+<ul><li>The ~22-member stage/source protocol is now built from a single constructor (<code>.pump_protocol()</code>) that supplies safe defaults and stamps an explicit <code>"stage"</code>/<code>"source"</code> role tag, replacing four hand-maintained copies.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.0" id="siphon-070">siphon 0.7.0<a class="anchor" aria-label="anchor" href="#siphon-070"></a></h2>
 <div class="section level3">
@@ -125,7 +149,7 @@
 <code><a href="../reference/pump_status.html">pump_status()</a></code> returns a snapshot of stage state.</li>
 <li>Added new <code><a href="../reference/pump_drain.html">pump_drain()</a></code> function to run pipelines without accumulating items in memory, suitable for persistent daemon processes.</li>
 </ul></li>
-<li>Implemented S3 generic method <code>length.pump()</code> (replaces <code>$size()</code> method) for R-idiomatic dataset length queries.</li>
+<li>Implemented S3 generic method <code><a href="../reference/length.pump.html">length.pump()</a></code> (replaces <code>$size()</code> method) for R-idiomatic dataset length queries.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="enhancements--bug-fixes-0-4-2">Enhancements &amp; Bug Fixes<a class="anchor" aria-label="anchor" href="#enhancements--bug-fixes-0-4-2"></a></h3>

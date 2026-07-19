@@ -1,5 +1,42 @@
 # Changelog
 
+## siphon (development version)
+
+### Behavior changes
+
+- [`length()`](https://rdrr.io/r/base/length.html) on a pump pipeline
+  now returns `NA_integer_` for infinite sources instead of `Inf`,
+  matching base R’s requirement that
+  [`length()`](https://rdrr.io/r/base/length.html) be a non-negative
+  integer. The raw count (still `Inf`) remains available via
+  `x$length()`.
+
+### Deprecations
+
+- The flat top-level copy of the terminal stage’s fields in
+  [`pump_status()`](https://rolfsimoes.github.io/siphon/reference/pump_status.md)
+  is deprecated and will be removed in a future minor release. Read
+  per-stage values from `x$stages` instead.
+
+### Fixes
+
+- [`pump_status()`](https://rolfsimoes.github.io/siphon/reference/pump_status.md)
+  on a pipeline whose only stage sits over an empty source now reports
+  it as a stage (with its source and sink) instead of misreporting it as
+  a bare source.
+- `reset_stats()` now also clears the error count, so it and `stats()`
+  agree on what a stats snapshot contains.
+- An unreachable slot-acquisition failure in the scheduler now raises an
+  internal error instead of silently dropping a pulled item without
+  releasing it.
+
+### Internal
+
+- The ~22-member stage/source protocol is now built from a single
+  constructor (`.pump_protocol()`) that supplies safe defaults and
+  stamps an explicit `"stage"`/`"source"` role tag, replacing four
+  hand-maintained copies.
+
 ## siphon 0.7.0
 
 ### Behavior changes
@@ -134,8 +171,9 @@
     [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)
     function to run pipelines without accumulating items in memory,
     suitable for persistent daemon processes.
-- Implemented S3 generic method `length.pump()` (replaces `$size()`
-  method) for R-idiomatic dataset length queries.
+- Implemented S3 generic method
+  [`length.pump()`](https://rolfsimoes.github.io/siphon/reference/length.pump.md)
+  (replaces `$size()` method) for R-idiomatic dataset length queries.
 
 ### Enhancements & Bug Fixes
 

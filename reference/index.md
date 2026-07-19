@@ -8,6 +8,8 @@
   : Format a pipeline status snapshot
 - [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md)
   : Create a future backend
+- [`length(`*`<pump>`*`)`](https://rolfsimoes.github.io/siphon/reference/length.pump.md)
+  : Number of items in a pump pipeline
 - [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md)
   : Create a main-thread backend
 - [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md)
