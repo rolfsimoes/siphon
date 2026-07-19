@@ -1,7 +1,7 @@
 Package: siphon
 Type: Package
 Title: Pull-Based Staged Pipelines
-Version: 0.7.0.9000
+Version: 0.8.0
 Depends: R (>= 4.1.0)
 Authors@R: c(
     person(
