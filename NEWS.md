@@ -2,6 +2,28 @@
 
 ## siphon (development version)
 
+### New features
+
+- Added `parallel_workers()` and `parallel_busy()` to inspect a parallel
+  backend's worker count and per-worker in-flight state (e.g. to find
+  quarantined nodes of an attached cluster after a failed run).
+
+### Fixes
+
+- An aborted pipeline run now quiesces its parallel backends: pending
+  results of in-flight jobs are drained (bounded by
+  `options(siphon.quiesce_timeout =)`, default 30 s) so they can no longer
+  be read as the results of the next submission on the same nodes.
+  Previously, reusing a cluster after an abort — an owned backend driven
+  again, or the externally managed cluster behind
+  `parallel_backend(cluster =)` used directly — could silently deliver
+  stale results to the next user. Nodes that cannot be drained in time are
+  replaced on owned pools and left quarantined (busy) on attached
+  clusters, where the owner can locate them with `parallel_busy()`.
+- Stage runners installed on persistent workers (parallel, mirai) are now
+  uninstalled when the pipeline closes, so long-lived pools no longer
+  accumulate one runner per stage per run.
+
 ## siphon 0.8.0
 
 ### Behavior changes
