@@ -81,8 +81,10 @@ functions from the \code{parallel} package to communicate with cluster nodes.
 When a stage first advances, its function and constant arguments are
 installed once on every node as a per-stage runner; each job then
 ships only the item data. Runner installations are recorded alongside
-\code{\link[=parallel_setup_workers]{parallel_setup_workers()}} expressions and replayed on replacement
-nodes after a worker failure. Stage functions must be self-contained
+\code{\link[=parallel_setup_workers]{parallel_setup_workers()}} expressions, replayed on replacement
+nodes after a worker failure, and uninstalled when the pipeline
+closes, so long-lived pools do not accumulate one runner per stage
+per run. Stage functions must be self-contained
 or carry their dependencies in their closure environment; objects they
 reference from the global environment are not shipped.
 }
@@ -109,6 +111,14 @@ detection is connection-based, so a worker that stalls without dying is
 never detected and there is no job timeout) and failures of the main R
 process (there is no persistence or checkpointing; in-flight work is
 lost).
+
+When a run aborts (an error escapes \code{pump_run()}/\code{pump_drain()}), the
+backend is quiesced: pending results of in-flight jobs are drained and
+discarded, bounded by \code{options(siphon.quiesce_timeout =)} (default 30
+seconds), so they cannot be read as the results of a later submission
+on the same nodes. A node that cannot be drained in time is replaced
+on an owned pool and left quarantined (busy) on an attached cluster;
+use \code{\link[=parallel_busy]{parallel_busy()}} to locate quarantined nodes.
 
 On a backend created with \code{cluster}, none of the above recovery
 applies: a worker connection failure surfaces as a \code{pump_error} value
@@ -142,5 +152,6 @@ if (requireNamespace("parallel", quietly = TRUE)) {
 }
 }
 \seealso{
-\code{\link[=parallel_setup_workers]{parallel_setup_workers()}}, \code{\link[=parallel_stop]{parallel_stop()}}
+\code{\link[=parallel_setup_workers]{parallel_setup_workers()}}, \code{\link[=parallel_stop]{parallel_stop()}},
+\code{\link[=parallel_workers]{parallel_workers()}}
 }

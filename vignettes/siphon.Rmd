@@ -159,7 +159,7 @@ The `max_workers` parameter specifies the maximum number of active processing sl
 | Main thread | `main_backend()` | `"main"` | Runs jobs synchronously in the current R process. |
 | Mirai | `mirai_backend()` | `"mirai"` | Submits jobs through `mirai::mirai()`. |
 | Future | `future_backend()` | `"future"` | Submits jobs through `future::future()`. |
-| Parallel | `parallel_backend(workers)` | — | Owns a PSOCK cluster with fault tolerance to worker failures: crashed workers are replaced and their jobs resubmitted (see `?parallel_backend`). No string alias, since it requires a `workers` argument. |
+| Parallel | `parallel_backend(workers)` | — | Owns a PSOCK cluster with fault tolerance to worker failures: crashed workers are replaced and their jobs resubmitted (see `?parallel_backend`). Can instead attach to an externally managed cluster with `cluster =` (no ownership, no recovery). No string alias, since it requires a `workers` argument. |
 
 Both styles are valid, and string aliases are automatically resolved internally. For instance, the following two specifications are equivalent:
 
@@ -248,6 +248,10 @@ res <- items |>
 print(res)
 parallel_stop(bk)
 ```
+
+The pool stays clean across runs: if a run aborts, pending results of in-flight jobs are drained (bounded by `options(siphon.quiesce_timeout =)`) so they cannot surface as the results of a later run, and stage runners installed on the workers are uninstalled when the pipeline closes.
+
+To integrate with a cluster you manage yourself, attach it with `parallel_backend(cluster = cl)`. The backend never creates, replaces, or stops those nodes: worker recovery is disabled, and a node that fails (or cannot be drained after an abort) is quarantined instead — `parallel_workers()` and `parallel_busy()` report the pool's size and per-node in-flight state so the owner can find and repair it.
 
 See `?parallel_backend` for the full fault-tolerance contract, including what is *not* handled (hung workers and failures of the main R process).
 
