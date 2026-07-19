@@ -1,53 +1,57 @@
-# siphon (development version)
+# Change log
 
-## Behavior changes
+## siphon (development version)
 
-- `length()` on a pump pipeline now returns `NA_integer_` for infinite sources instead of `Inf`, matching base R's requirement that `length()` be a non-negative integer. The raw count (still `Inf`) remains available via `x$length()`.
+## siphon 0.8.0
 
-## Deprecations
+### Behavior changes
 
-- The flat top-level copy of the terminal stage's fields in `pump_status()` is deprecated and will be removed in a future minor release. Read per-stage values from `x$stages` instead.
+- `length()` on a pump pipeline returns `NA_integer_` for infinite sources instead of `Inf`. The raw count remains available via `x$length()`.
 
-## Fixes
+### Deprecations
 
-- `pump_status()` on a pipeline whose only stage sits over an empty source now reports it as a stage (with its source and sink) instead of misreporting it as a bare source.
-- `reset_stats()` now also clears the error count, so it and `stats()` agree on what a stats snapshot contains.
-- An unreachable slot-acquisition failure in the scheduler now raises an internal error instead of silently dropping a pulled item without releasing it.
+- The flat top-level copy of the terminal stage's fields in `pump_status()` is deprecated and will be removed in a future minor release. Use `x$stages` for per-stage values.
 
-## Internal
+### Fixes
 
-- The ~22-member stage/source protocol is now built from a single constructor (`.pump_protocol()`) that supplies safe defaults and stamps an explicit `"stage"`/`"source"` role tag, replacing four hand-maintained copies.
+- `pump_status()` on a pipeline with a single stage over an empty source reports it as a stage with its source and sink.
+- `reset_stats()` clears the error count.
+- Unreachable slot-acquisition failures in the scheduler raise an internal error.
 
-# siphon 0.7.0
+### Internal
 
-## Behavior changes
+- The stage/source protocol uses a single constructor (`.pump_protocol()`) with safe defaults and explicit `"stage"`/`"source"` role tags, replacing four hand-maintained copies.
+
+## siphon 0.7.0
+
+### Behavior changes
 
 - `pump_run(backend =)` and `pump_drain(backend =)` now apply to stages without explicit backend. Inherited backends resolve at first beat; explicit backends validate at construction.
 - `parallel_backend()` is now a specification: workers start on first use. `parallel_setup_workers()` queues expressions before cluster starts.
 - Future backend: removed explicit globals list, restoring automatic detection. Mirai and parallel stage functions must be self-contained.
 - All backends inherit from `pump_backend` class; objects without it are rejected.
 
-## Performance
+### Performance
 
 - Stage functions and constant arguments ship once per stage (mirai, parallel) instead of per item. Payloads replay on replacement nodes.
 
-## New features
+### New features
 
 - Added `pump_custom_backend()` for custom execution via plain R functions: `count`, `submit`, `is_ready`, `collect`, optional `register` and `open`. See "Extending siphon" vignette.
 - Added `parallel_backend(cluster =)` to attach externally-managed PSOCK clusters without ownership. Worker failures surface as item errors.
 - `pump_drain()` gained `on_error` and `timeout`. Draining exhausted pipelines is a no-op.
 
-## Internal
+### Internal
 
 - Unified backend contract: lifecycle (`.pump_backend_open()`/`.pump_backend_close()`), registration (`.pump_executor_register()`), submission (`.pump_executor_new_job(backend, handle, data)`). Shared driver for `pump_run()` and `pump_drain()`.
 
-## Fixes
+### Fixes
 
 - Fixed CRAN policy issues; added spelling and linting configuration.
 
-# siphon 0.6.0
+## siphon 0.6.0
 
-## Pipeline inspection
+### Pipeline inspection
 
 - Added `pump_step()` for advancing work without consuming results.
 - Added `pump_peek()` for viewing ready results without removing them.
@@ -58,7 +62,7 @@
 - Added `delivered` field to `pump_status()` reporting items that left the pipeline.
 - Added `in_flight` and `buffered_ids` fields to `pump_status()` for per-stage tracking.
 
-## Timing model (breaking)
+### Timing model (breaking)
 
 - Redesigned stage timing metrics to accumulate only inside `next_item()`/`pop_item()` calls.
 - Removed fields: `poll_hits`, `poll_misses`, `poll_wall_time`, `idle_time`.
@@ -67,26 +71,26 @@
 - `pump_step()` stops early when further beats cannot change anything.
 - All durations now consistently in milliseconds (sources previously used seconds).
 
-## Scheduling
+### Scheduling
 
 - Changed beat to drain-advance-drain; jobs completing during advance land in buffer immediately.
 
-## Fixes
+### Fixes
 
 - Added `%||%` compatibility shim for R < 4.4.0.
 - Fixed `parallel_backend()` stages to report as `"parallel"` instead of `"unknown"`.
 - Refactored internal stage tick into single-responsibility helpers.
 
-# siphon 0.5.0
+## siphon 0.5.0
 
 - Added `parallel_eval_workers()` for evaluating expressions in worker global environments.
 - Corrected `parallel_backend()` documentation for shared backends across stages.
 - Added vignette section on pooling strategies.
 - Changed worker setup to broadcast to all nodes before collecting results.
 
-# siphon 0.4.2
+## siphon 0.4.2
 
-## Package Renaming & API Standardization
+### Package Renaming & API Standardization
 
 - Standardized public API with the `pump_` prefix:
   - `pump()` adds a processing stage to a pipeline.
@@ -96,7 +100,7 @@
   - Added new `pump_drain()` function to run pipelines without accumulating items in memory, suitable for persistent daemon processes.
 - Implemented S3 generic method `length.pump()` (replaces `$size()` method) for R-idiomatic dataset length queries.
 
-## Enhancements & Bug Fixes
+### Enhancements & Bug Fixes
 
 - Decoupled total pipeline `length` from intermediate `buffer_size` to prevent memory bloat and coercion errors on infinite pipelines.
 - Stage `buffer_size` now defaults to `min(length(x), 1000L)`, capping memory usage for large/infinite sources while allocating correctly for small ones.
