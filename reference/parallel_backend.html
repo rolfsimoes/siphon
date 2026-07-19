@@ -13,7 +13,7 @@ cluster nodes."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -136,8 +136,10 @@ functions from the <code>parallel</code> package to communicate with cluster nod
 <p>When a stage first advances, its function and constant arguments are
 installed once on every node as a per-stage runner; each job then
 ships only the item data. Runner installations are recorded alongside
-<code><a href="parallel_setup_workers.html">parallel_setup_workers()</a></code> expressions and replayed on replacement
-nodes after a worker failure. Stage functions must be self-contained
+<code><a href="parallel_setup_workers.html">parallel_setup_workers()</a></code> expressions, replayed on replacement
+nodes after a worker failure, and uninstalled when the pipeline
+closes, so long-lived pools do not accumulate one runner per stage
+per run. Stage functions must be self-contained
 or carry their dependencies in their closure environment; objects they
 reference from the global environment are not shipped.</p>
     </div>
@@ -164,6 +166,13 @@ detection is connection-based, so a worker that stalls without dying is
 never detected and there is no job timeout) and failures of the main R
 process (there is no persistence or checkpointing; in-flight work is
 lost).</p>
+<p>When a run aborts (an error escapes <code><a href="pump_run.html">pump_run()</a></code>/<code><a href="pump_drain.html">pump_drain()</a></code>), the
+backend is quiesced: pending results of in-flight jobs are drained and
+discarded, bounded by <code>options(siphon.quiesce_timeout =)</code> (default 30
+seconds), so they cannot be read as the results of a later submission
+on the same nodes. A node that cannot be drained in time is replaced
+on an owned pool and left quarantined (busy) on an attached cluster;
+use <code><a href="parallel_workers.html">parallel_busy()</a></code> to locate quarantined nodes.</p>
 <p>On a backend created with <code>cluster</code>, none of the above recovery
 applies: a worker connection failure surfaces as a <code>pump_error</code> value
 for the affected item (subject to the <code>on_error</code> policy) and the dead
@@ -172,7 +181,8 @@ capacity shrinks for the rest of the run.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="parallel_setup_workers.html">parallel_setup_workers()</a></code>, <code><a href="parallel_stop.html">parallel_stop()</a></code></p></div>
+    <div class="dont-index"><p><code><a href="parallel_setup_workers.html">parallel_setup_workers()</a></code>, <code><a href="parallel_stop.html">parallel_stop()</a></code>,
+<code><a href="parallel_workers.html">parallel_workers()</a></code></p></div>
     </div>
 
     <div class="section level2">

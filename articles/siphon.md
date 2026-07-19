@@ -167,7 +167,7 @@ constructor function (recommended) or a string alias:
 | Main thread | [`main_backend()`](https://rolfsimoes.github.io/siphon/reference/main_backend.md) | `"main"` | Runs jobs synchronously in the current R process. |
 | Mirai | [`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md) | `"mirai"` | Submits jobs through [`mirai::mirai()`](https://mirai.r-lib.org/reference/mirai.html). |
 | Future | [`future_backend()`](https://rolfsimoes.github.io/siphon/reference/future_backend.md) | `"future"` | Submits jobs through [`future::future()`](https://future.futureverse.org/reference/future.html). |
-| Parallel | `parallel_backend(workers)` | — | Owns a PSOCK cluster with fault tolerance to worker failures: crashed workers are replaced and their jobs resubmitted (see [`?parallel_backend`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)). No string alias, since it requires a `workers` argument. |
+| Parallel | `parallel_backend(workers)` | — | Owns a PSOCK cluster with fault tolerance to worker failures: crashed workers are replaced and their jobs resubmitted (see [`?parallel_backend`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)). Can instead attach to an externally managed cluster with `cluster =` (no ownership, no recovery). No string alias, since it requires a `workers` argument. |
 
 Both styles are valid, and string aliases are automatically resolved
 internally. For instance, the following two specifications are
@@ -327,6 +327,22 @@ print(res)
 parallel_stop(bk)
 ```
 
+The pool stays clean across runs: if a run aborts, pending results of
+in-flight jobs are drained (bounded by
+`options(siphon.quiesce_timeout =)`) so they cannot surface as the
+results of a later run, and stage runners installed on the workers are
+uninstalled when the pipeline closes.
+
+To integrate with a cluster you manage yourself, attach it with
+`parallel_backend(cluster = cl)`. The backend never creates, replaces,
+or stops those nodes: worker recovery is disabled, and a node that fails
+(or cannot be drained after an abort) is quarantined instead —
+[`parallel_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_workers.md)
+and
+[`parallel_busy()`](https://rolfsimoes.github.io/siphon/reference/parallel_workers.md)
+report the pool’s size and per-node in-flight state so the owner can
+find and repair it.
+
 See
 [`?parallel_backend`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
 for the full fault-tolerance contract, including what is *not* handled
@@ -373,7 +389,7 @@ stage2 <- unique(vapply(res, function(v) v[["stage2_pid"]], numeric(1)))
 
 # often non-empty: nodes are pooled, not bound to a stage
 intersect(stage1, stage2)
-#. [1] 7597
+#. [1] 7532
 parallel_stop(bk)
 ```
 
@@ -469,14 +485,14 @@ pump_drain(f, verbose = FALSE, handle_fn = function(id, data, ok) {
 })
 
 print(snapshot)
-#. <pump_status (21)>
+#. <pump_status (20)>
 #. ┌─ source   7/20
 #. ├─ stage 1 mirai
 #. │    wrk [#####] 2/2   buf [##---] 1/2    done 5   err 0
-#. │    fn 0.3ms/it   crd 0.2ms/bt   wrk 20% stv 0% blk 80%
+#. │    fn 0.3ms/it   crd 0.6ms/bt   wrk 20% stv 0% blk 80%
 #. ├─ stage 2 mirai  * bottleneck
 #. │    wrk [#####] 1/1   buf [-----] 0/20   done 3   err 0
-#. │    fn 30.6ms/it   crd 0.1ms/bt   wrk 94% stv 6% blk 0%
+#. │    fn 30.5ms/it   crd 0.1ms/bt   wrk 93% stv 7% blk 0%
 #. └─ sink   3/20
 
 mirai::daemons(0)
@@ -725,14 +741,14 @@ pump_run(f, verbose = FALSE)
 
 # Source position, per-stage completed/errors, and a fn-vs-idle timing summary
 print(pump_status(f))
-#. <pump_status (19)>
+#. <pump_status (17)>
 #. ┌─ source   5/5
 #. ├─ stage 1 mirai
 #. │    wrk [-----] 0/2   buf [-----] 0/5   done 5   err 0
-#. │    fn 10.6ms/it   crd 0.1ms/bt   wrk 100% stv 0% blk 0%
+#. │    fn 10.6ms/it   crd 0.3ms/bt   wrk 100% stv 0% blk 0%
 #. ├─ stage 2 mirai
 #. │    wrk [-----] 0/2   buf [-----] 0/5   done 5   err 0
-#. │    fn 0.4ms/it   crd 0.2ms/bt   wrk 83% stv 17% blk 0%
+#. │    fn 0.3ms/it   crd 0.1ms/bt   wrk 80% stv 20% blk 0%
 #. └─ sink   5/5
 
 mirai::daemons(0)

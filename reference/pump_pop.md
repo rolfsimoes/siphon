@@ -46,7 +46,7 @@ pump_step(p)
 #> ┌─ source   1/5
 #> ├─ stage 1 main
 #> │    wrk [-----] 0/1   buf [#----] 1/5   done 1   err 0
-#> │    fn 0.0ms/it   crd 1.0ms/bt   wrk 100% stv 0% blk 0%
+#> │    fn 0.0ms/it   crd 0.0ms/bt   wrk 100% stv 0% blk 0%
 #> └─ sink   0/5
 v <- pump_pop(p)
 v$data

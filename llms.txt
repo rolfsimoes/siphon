@@ -248,6 +248,9 @@ examples.
   : Run setup code on all workers of a parallel backend
 - [`parallel_stop()`](https://rolfsimoes.github.io/siphon/reference/parallel_stop.md)
   : Stop a parallel backend
+- [`parallel_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_workers.md)
+  [`parallel_busy()`](https://rolfsimoes.github.io/siphon/reference/parallel_workers.md)
+  : Inspect the workers of a parallel backend
 - [`print(`*`<pump>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump.md)
   : Print a pump pipeline
 - [`print(`*`<pump_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_backend.md)

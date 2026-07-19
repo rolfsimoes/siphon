@@ -105,10 +105,11 @@ When a stage first advances, its function and constant arguments are
 installed once on every node as a per-stage runner; each job then ships
 only the item data. Runner installations are recorded alongside
 [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
-expressions and replayed on replacement nodes after a worker failure.
-Stage functions must be self-contained or carry their dependencies in
-their closure environment; objects they reference from the global
-environment are not shipped.
+expressions, replayed on replacement nodes after a worker failure, and
+uninstalled when the pipeline closes, so long-lived pools do not
+accumulate one runner per stage per run. Stage functions must be
+self-contained or carry their dependencies in their closure environment;
+objects they reference from the global environment are not shipped.
 
 ## Fault tolerance
 
@@ -136,6 +137,16 @@ never detected and there is no job timeout) and failures of the main R
 process (there is no persistence or checkpointing; in-flight work is
 lost).
 
+When a run aborts (an error escapes
+[`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)/[`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)),
+the backend is quiesced: pending results of in-flight jobs are drained
+and discarded, bounded by `options(siphon.quiesce_timeout =)` (default
+30 seconds), so they cannot be read as the results of a later submission
+on the same nodes. A node that cannot be drained in time is replaced on
+an owned pool and left quarantined (busy) on an attached cluster; use
+[`parallel_busy()`](https://rolfsimoes.github.io/siphon/reference/parallel_workers.md)
+to locate quarantined nodes.
+
 On a backend created with `cluster`, none of the above recovery applies:
 a worker connection failure surfaces as a `pump_error` value for the
 affected item (subject to the `on_error` policy) and the dead node is
@@ -145,7 +156,8 @@ for the rest of the run.
 ## See also
 
 [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md),
-[`parallel_stop()`](https://rolfsimoes.github.io/siphon/reference/parallel_stop.md)
+[`parallel_stop()`](https://rolfsimoes.github.io/siphon/reference/parallel_stop.md),
+[`parallel_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_workers.md)
 
 ## Examples
 
