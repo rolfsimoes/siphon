@@ -28,8 +28,10 @@ The backend, invisibly.
 ## Details
 
 By default, stopping fails if jobs are still active. Set `force = TRUE`
-to stop the cluster regardless. Stopping an already stopped backend is a
-no-op.
+to stop the cluster regardless. Stopping an already stopped backend (or
+one whose cluster was never started) is a no-op. Stopping a backend
+created with `parallel_backend(cluster = )` is an error: the backend
+does not own that cluster.
 
 ## See also
 

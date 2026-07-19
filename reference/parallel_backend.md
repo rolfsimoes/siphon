@@ -1,15 +1,20 @@
 # Create a parallel (PSOCK) backend
 
-`parallel_backend()` creates and manages its own PSOCK cluster and
-submits jobs to it. Jobs are dispatched with a non-blocking send and
-readiness is polled with
-[`socketSelect()`](https://rdrr.io/r/base/socketSelect.html), so the
-main process never blocks while jobs run on the cluster nodes.
+`parallel_backend()` manages a PSOCK cluster and submits jobs to it.
+Jobs are dispatched with a non-blocking send and readiness is polled
+with [`socketSelect()`](https://rdrr.io/r/base/socketSelect.html), so
+the main process never blocks while jobs run on the cluster nodes.
 
 ## Usage
 
 ``` r
-parallel_backend(workers, ..., retries = 3L, retry_sleep = 0)
+parallel_backend(
+  workers = NULL,
+  ...,
+  retries = 3L,
+  retry_sleep = 0,
+  cluster = NULL
+)
 ```
 
 ## Arguments
@@ -19,20 +24,32 @@ parallel_backend(workers, ..., retries = 3L, retry_sleep = 0)
   The number of local worker processes to start, or a character vector
   of host names to run workers on (as accepted by
   [`parallel::makePSOCKcluster()`](https://rdrr.io/r/parallel/makeCluster.html)).
+  Mutually exclusive with `cluster`.
 
 - ...:
 
   Additional arguments passed to
   [`parallel::makePSOCKcluster()`](https://rdrr.io/r/parallel/makeCluster.html).
+  Only valid with `workers`.
 
 - retries:
 
   Number of times a job is resubmitted after a worker connection failure
-  before the job is marked as failed. A non-negative integer.
+  before the job is marked as failed. A non-negative integer. Ignored
+  when `cluster` is supplied.
 
 - retry_sleep:
 
   Seconds to wait before each retry attempt. A non-negative number.
+  Ignored when `cluster` is supplied.
+
+- cluster:
+
+  An existing cluster object (as returned by
+  [`parallel::makePSOCKcluster()`](https://rdrr.io/r/parallel/makeCluster.html))
+  to attach to instead of creating one. The backend does not take
+  ownership: you remain responsible for stopping the cluster. Mutually
+  exclusive with `workers`.
 
 ## Value
 
@@ -40,12 +57,28 @@ A backend object.
 
 ## Details
 
-The backend owns its cluster: it is created when `parallel_backend()` is
-called and must be shut down with
+With `workers`, the backend owns its cluster: `parallel_backend()`
+returns a cheap specification and the worker processes are started when
+the backend first opens (first pipeline run,
+[`parallel_eval_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_eval_workers.md)
+call, or stage registration). Shut it down with
 [`parallel_stop()`](https://rolfsimoes.github.io/siphon/reference/parallel_stop.md)
-when no longer needed. Each node runs at most one job at a time, so
-`max_workers` for a stage using this backend must not exceed the number
-of workers (enforced by
+when no longer needed.
+[`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
+may be called before the cluster exists: expressions are recorded and
+replayed at open.
+
+With `cluster`, the backend attaches to an externally managed cluster
+instead (for integration with packages that run their own worker pool).
+It never creates, replaces, or stops those nodes: worker recovery is
+disabled (see the fault tolerance section), `retries`/`retry_sleep` are
+ignored, and
+[`parallel_stop()`](https://rolfsimoes.github.io/siphon/reference/parallel_stop.md)
+refuses - stop the cluster yourself with
+[`parallel::stopCluster()`](https://rdrr.io/r/parallel/makeCluster.html).
+
+Each node runs at most one job at a time, so `max_workers` for a stage
+using this backend must not exceed the number of workers (enforced by
 [`pump()`](https://rolfsimoes.github.io/siphon/reference/pump.md)).
 
 Passing the same backend to several
@@ -67,6 +100,15 @@ the "Pooling strategies" section of
 
 This backend uses the unexported `sendCall()` and `recvResult()`
 functions from the `parallel` package to communicate with cluster nodes.
+
+When a stage first advances, its function and constant arguments are
+installed once on every node as a per-stage runner; each job then ships
+only the item data. Runner installations are recorded alongside
+[`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
+expressions and replayed on replacement nodes after a worker failure.
+Stage functions must be self-contained or carry their dependencies in
+their closure environment; objects they reference from the global
+environment are not shipped.
 
 ## Fault tolerance
 
@@ -94,6 +136,12 @@ never detected and there is no job timeout) and failures of the main R
 process (there is no persistence or checkpointing; in-flight work is
 lost).
 
+On a backend created with `cluster`, none of the above recovery applies:
+a worker connection failure surfaces as a `pump_error` value for the
+affected item (subject to the `on_error` policy) and the dead node is
+quarantined - no further jobs are dispatched to it, so capacity shrinks
+for the rest of the run.
+
 ## See also
 
 [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md),
@@ -116,5 +164,12 @@ if (requireNamespace("parallel", quietly = TRUE)) {
         pump(function(x) x + 1, backend = bk, max_workers = 1)
     pump_run(f, verbose = FALSE)
     parallel_stop(bk)
+
+    # attach to a cluster you manage yourself (no ownership taken)
+    cl <- parallel::makePSOCKcluster(2)
+    bk <- parallel_backend(cluster = cl)
+    f <- 1:5 |> pump(function(x) x + 1, backend = bk)
+    pump_run(f, verbose = FALSE)
+    parallel::stopCluster(cl)
 }
 ```

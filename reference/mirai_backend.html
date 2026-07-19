@@ -9,7 +9,7 @@ available slots is read from mirai::status()$connections."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -22,6 +22,7 @@ available slots is read from mirai::status()$connections."></head><body>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/daemons.html">Asynchronous Daemons</a></li>
+    <li><a class="dropdown-item" href="../articles/extending.html">Extending siphon with Custom Backends</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -59,6 +60,14 @@ available slots is read from <code>mirai::status()$connections</code>.</p>
     <p>Note: When using mirai_backend(), you are responsible for managing
 the mirai daemon lifecycle. Call <code>mirai::daemons(n)</code> to start workers and
 <code>mirai::daemons(0)</code> to shut them down. See the vignette for examples.</p>
+<p>When a stage first advances, its function and constant arguments are
+installed once on every connected daemon (via <code><a href="https://mirai.r-lib.org/reference/everywhere.html" class="external-link">mirai::everywhere()</a></code>);
+each job then ships only the item data. The daemon pool is therefore
+assumed to be static for the duration of a run: a daemon that connects
+after the stage registered does not have the stage payload and will
+fail jobs routed to it. Stage functions must be self-contained or
+carry their dependencies in their closure environment; objects they
+reference from the global environment are not shipped.</p>
 <p>Fault tolerance is delegated to the <code>mirai</code> framework: this backend
 performs no retries. If a daemon dies while running a job, the
 resulting <code>errorValue</code> is surfaced as a <code>pump_error</code> value for that

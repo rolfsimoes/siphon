@@ -20,6 +20,16 @@ Note: When using mirai_backend(), you are responsible for managing the
 mirai daemon lifecycle. Call `mirai::daemons(n)` to start workers and
 `mirai::daemons(0)` to shut them down. See the vignette for examples.
 
+When a stage first advances, its function and constant arguments are
+installed once on every connected daemon (via
+[`mirai::everywhere()`](https://mirai.r-lib.org/reference/everywhere.html));
+each job then ships only the item data. The daemon pool is therefore
+assumed to be static for the duration of a run: a daemon that connects
+after the stage registered does not have the stage payload and will fail
+jobs routed to it. Stage functions must be self-contained or carry their
+dependencies in their closure environment; objects they reference from
+the global environment are not shipped.
+
 Fault tolerance is delegated to the `mirai` framework: this backend
 performs no retries. If a daemon dies while running a job, the resulting
 `errorValue` is surfaced as a `pump_error` value for that item (subject

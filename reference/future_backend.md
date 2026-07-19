@@ -23,6 +23,17 @@ future plan lifecycle. Call
 to set a plan and restore the previous plan when done. See the vignette
 for examples.
 
+Globals required by the stage function are detected automatically by the
+`future` framework, exactly as in a plain
+[`future::future()`](https://future.futureverse.org/reference/future.html)
+call. Because plans provide no persistent worker state, the function and
+its detected globals travel with every job; for stages with large
+captured state, prefer
+[`mirai_backend()`](https://rolfsimoes.github.io/siphon/reference/mirai_backend.md)
+or
+[`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md),
+which install the stage payload on each worker once.
+
 Fault tolerance is delegated to the `future` framework: this backend
 performs no retries. If a worker dies while running a job, the resulting
 `FutureError` is surfaced as a `pump_error` value for that item (subject

@@ -248,18 +248,14 @@ examples.
   : Stop a parallel backend
 - [`print(`*`<pump>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump.md)
   : Print a pump pipeline
-- [`print(`*`<pump_future_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_future_backend.md)
-  : Print a future backend
-- [`print(`*`<pump_main_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_main_backend.md)
-  : Print a main backend
-- [`print(`*`<pump_mirai_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_mirai_backend.md)
-  : Print a mirai backend
-- [`print(`*`<pump_parallel_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_parallel_backend.md)
-  : Print a parallel backend
+- [`print(`*`<pump_backend>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_backend.md)
+  : Print a backend
 - [`print(`*`<pump_status>`*`)`](https://rolfsimoes.github.io/siphon/reference/print.pump_status.md)
   : Print a pump_status object
 - [`pump()`](https://rolfsimoes.github.io/siphon/reference/pump.md) :
   Add a processing stage to a pipeline
+- [`pump_custom_backend()`](https://rolfsimoes.github.io/siphon/reference/pump_custom_backend.md)
+  : Create a custom backend from plain functions
 - [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)
   : Drain a siphon pipeline
 - [`pump_item_registry()`](https://rolfsimoes.github.io/siphon/reference/pump_item_registry.md)
@@ -285,5 +281,7 @@ examples.
 
 - [Asynchronous
   Daemons](https://rolfsimoes.github.io/siphon/articles/daemons.md):
+- [Extending siphon with Custom
+  Backends](https://rolfsimoes.github.io/siphon/articles/extending.md):
 - [Pull-Based Staged Pipelines with
   siphon](https://rolfsimoes.github.io/siphon/articles/siphon.md):

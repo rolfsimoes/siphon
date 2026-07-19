@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -20,6 +20,7 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/daemons.html">Asynchronous Daemons</a></li>
+    <li><a class="dropdown-item" href="../articles/extending.html">Extending siphon with Custom Backends</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -37,6 +38,37 @@
       <small>Source: <a href="https://github.com/rolfsimoes/siphon/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.0" id="siphon-070">siphon 0.7.0<a class="anchor" aria-label="anchor" href="#siphon-070"></a></h2>
+<div class="section level3">
+<h3 id="behavior-changes-0-7-0">Behavior changes<a class="anchor" aria-label="anchor" href="#behavior-changes-0-7-0"></a></h3>
+<ul><li>
+<code>pump_run(backend =)</code> and <code>pump_drain(backend =)</code> now apply to stages without explicit backend. Inherited backends resolve at first beat; explicit backends validate at construction.</li>
+<li>
+<code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> is now a specification: workers start on first use. <code><a href="../reference/parallel_setup_workers.html">parallel_setup_workers()</a></code> queues expressions before cluster starts.</li>
+<li>Future backend: removed explicit globals list, restoring automatic detection. Mirai and parallel stage functions must be self-contained.</li>
+<li>All backends inherit from <code>pump_backend</code> class; objects without it are rejected.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="performance-0-7-0">Performance<a class="anchor" aria-label="anchor" href="#performance-0-7-0"></a></h3>
+<ul><li>Stage functions and constant arguments ship once per stage (mirai, parallel) instead of per item. Payloads replay on replacement nodes.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="new-features-0-7-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-7-0"></a></h3>
+<ul><li>Added <code><a href="../reference/pump_custom_backend.html">pump_custom_backend()</a></code> for custom execution via plain R functions: <code>count</code>, <code>submit</code>, <code>is_ready</code>, <code>collect</code>, optional <code>register</code> and <code>open</code>. See “Extending siphon” vignette.</li>
+<li>Added <code>parallel_backend(cluster =)</code> to attach externally-managed PSOCK clusters without ownership. Worker failures surface as item errors.</li>
+<li>
+<code><a href="../reference/pump_drain.html">pump_drain()</a></code> gained <code>on_error</code> and <code>timeout</code>. Draining exhausted pipelines is a no-op.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="internal-0-7-0">Internal<a class="anchor" aria-label="anchor" href="#internal-0-7-0"></a></h3>
+<ul><li>Unified backend contract: lifecycle (<code>.pump_backend_open()</code>/<code>.pump_backend_close()</code>), registration (<code>.pump_executor_register()</code>), submission (<code>.pump_executor_new_job(backend, handle, data)</code>). Shared driver for <code><a href="../reference/pump_run.html">pump_run()</a></code> and <code><a href="../reference/pump_drain.html">pump_drain()</a></code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="fixes-0-7-0">Fixes<a class="anchor" aria-label="anchor" href="#fixes-0-7-0"></a></h3>
+<ul><li>Fixed CRAN policy issues; added spelling and linting configuration.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.0" id="siphon-060">siphon 0.6.0<a class="anchor" aria-label="anchor" href="#siphon-060"></a></h2>
 <div class="section level3">

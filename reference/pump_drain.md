@@ -9,7 +9,15 @@ suitable for infinite or long-running pipelines.
 ## Usage
 
 ``` r
-pump_drain(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main")
+pump_drain(
+  x,
+  handle_fn,
+  sleep_ms = 10,
+  verbose = TRUE,
+  on_error = "stop",
+  backend = "main",
+  timeout = NULL
+)
 ```
 
 ## Arguments
@@ -31,6 +39,13 @@ pump_drain(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main")
 
   If `TRUE`, show a text progress bar.
 
+- on_error:
+
+  Default error handling policy for all stages that do not explicitly
+  set their own `on_error`: `"stop"` throws on first error, `"collect"`
+  delivers error items to `handle_fn` with `ok = FALSE`, `"continue"`
+  drops failed items. Defaults to `"stop"`.
+
 - backend:
 
   Default backend for all stages that do not explicitly set their own
@@ -40,9 +55,24 @@ pump_drain(x, handle_fn, sleep_ms = 10, verbose = TRUE, backend = "main")
   directly for fault-tolerant PSOCK execution (no string alias).
   Defaults to `"main"`.
 
+- timeout:
+
+  Maximum time in seconds to wait for completion. If NULL (default),
+  waits indefinitely. If exceeded, throws an error. See the Details
+  section of
+  [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
+  for the cooperative-checking caveats, which apply here equally.
+
 ## Value
 
 Invisible `NULL`.
+
+## Details
+
+Unlike
+[`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md),
+draining an already-exhausted pipeline is a silent no-op, so
+daemon-style loops can re-invoke `pump_drain()` harmlessly.
 
 ## Examples
 

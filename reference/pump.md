@@ -37,11 +37,14 @@ pump(
 
   A backend object or one of `"main"`, `"mirai"`, or `"future"`. Use
   [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
-  directly for fault-tolerant PSOCK execution (no string alias). If
-  `NULL` (the default), the stage inherits the backend set by
+  directly for fault-tolerant PSOCK execution (no string alias). An
+  explicit backend is resolved and validated immediately. If `NULL` (the
+  default), the stage inherits the backend set by
   [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
   or
-  [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md).
+  [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md);
+  the inherited backend is resolved and validated when the stage first
+  advances (its first beat), and stays fixed from then on.
 
 - max_workers:
 

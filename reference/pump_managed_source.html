@@ -15,7 +15,7 @@ or releasing that item."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -28,6 +28,7 @@ or releasing that item."></head><body>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/daemons.html">Asynchronous Daemons</a></li>
+    <li><a class="dropdown-item" href="../articles/extending.html">Extending siphon with Custom Backends</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -86,15 +87,18 @@ or releasing that item.</p>
 
 
 <dt id="arg-commit-fn">commit_fn<a class="anchor" aria-label="anchor" href="#arg-commit-fn"></a></dt>
-<dd><p>Function called when the item is accepted by the terminal runner.</p></dd>
+<dd><p>Function called when the item is accepted by the
+terminal runner.</p></dd>
 
 
 <dt id="arg-abort-fn">abort_fn<a class="anchor" aria-label="anchor" href="#arg-abort-fn"></a></dt>
-<dd><p>Function called when the item leaves the runtime before acceptance.</p></dd>
+<dd><p>Function called when the item leaves the runtime
+before acceptance.</p></dd>
 
 
 <dt id="arg-release-fn">release_fn<a class="anchor" aria-label="anchor" href="#arg-release-fn"></a></dt>
-<dd><p>Optional function called when item-level tracking is released.</p></dd>
+<dd><p>Optional function called when item-level
+tracking is released.</p></dd>
 
 
 <dt id="arg-done-fn">done_fn<a class="anchor" aria-label="anchor" href="#arg-done-fn"></a></dt>

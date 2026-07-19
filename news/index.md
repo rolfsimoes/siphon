@@ -1,5 +1,53 @@
 # Changelog
 
+## siphon 0.7.0
+
+### Behavior changes
+
+- `pump_run(backend =)` and `pump_drain(backend =)` now apply to stages
+  without explicit backend. Inherited backends resolve at first beat;
+  explicit backends validate at construction.
+- [`parallel_backend()`](https://rolfsimoes.github.io/siphon/reference/parallel_backend.md)
+  is now a specification: workers start on first use.
+  [`parallel_setup_workers()`](https://rolfsimoes.github.io/siphon/reference/parallel_setup_workers.md)
+  queues expressions before cluster starts.
+- Future backend: removed explicit globals list, restoring automatic
+  detection. Mirai and parallel stage functions must be self-contained.
+- All backends inherit from `pump_backend` class; objects without it are
+  rejected.
+
+### Performance
+
+- Stage functions and constant arguments ship once per stage (mirai,
+  parallel) instead of per item. Payloads replay on replacement nodes.
+
+### New features
+
+- Added
+  [`pump_custom_backend()`](https://rolfsimoes.github.io/siphon/reference/pump_custom_backend.md)
+  for custom execution via plain R functions: `count`, `submit`,
+  `is_ready`, `collect`, optional `register` and `open`. See “Extending
+  siphon” vignette.
+- Added `parallel_backend(cluster =)` to attach externally-managed PSOCK
+  clusters without ownership. Worker failures surface as item errors.
+- [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md)
+  gained `on_error` and `timeout`. Draining exhausted pipelines is a
+  no-op.
+
+### Internal
+
+- Unified backend contract: lifecycle
+  (`.pump_backend_open()`/`.pump_backend_close()`), registration
+  (`.pump_executor_register()`), submission
+  (`.pump_executor_new_job(backend, handle, data)`). Shared driver for
+  [`pump_run()`](https://rolfsimoes.github.io/siphon/reference/pump_run.md)
+  and
+  [`pump_drain()`](https://rolfsimoes.github.io/siphon/reference/pump_drain.md).
+
+### Fixes
+
+- Fixed CRAN policy issues; added spelling and linting configuration.
+
 ## siphon 0.6.0
 
 ### Pipeline inspection
