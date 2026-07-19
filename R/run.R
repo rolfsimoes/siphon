@@ -31,8 +31,9 @@
     on.exit(if (is.function(x$close)) x$close(), add = TRUE)
 
     if (x$done()) {
-        # a genuinely empty source yields an empty result either way
-        if (error_on_exhausted && length(x) != 0L) {
+        # a genuinely empty source yields an empty result either way.
+        # Use x$length() (raw, may be Inf) not length(x) (NA for infinite).
+        if (error_on_exhausted && x$length() != 0L) {
             stop("source pipeline is exhausted")
         }
         return(invisible(NULL))
@@ -156,6 +157,9 @@ pump_run <- function(x,
                      on_error = "stop",
                      backend = "main",
                      timeout = NULL) {
+    # x may still be a bare R object here (wrapping happens in .pump_drive), so
+    # use length() (S3, defined for both) not x$length(). length() reports
+    # NA_integer_ for an infinite source, which falls through to the else.
     n_size <- length(x)
     if (is.finite(n_size)) {
         vals <- vector("list", n_size)
