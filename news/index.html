@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">siphon</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,135 +38,7 @@
       <small>Source: <a href="https://github.com/rolfsimoes/siphon/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="siphon-development-version">siphon (development version)<a class="anchor" aria-label="anchor" href="#siphon-development-version"></a></h2>
-<div class="section level3">
-<h3 id="behavior-changes-development-version">Behavior changes<a class="anchor" aria-label="anchor" href="#behavior-changes-development-version"></a></h3>
-<ul><li>
-<code><a href="https://rdrr.io/r/base/length.html" class="external-link">length()</a></code> on a pump pipeline now returns <code>NA_integer_</code> for infinite sources instead of <code>Inf</code>, matching base R’s requirement that <code><a href="https://rdrr.io/r/base/length.html" class="external-link">length()</a></code> be a non-negative integer. The raw count (still <code>Inf</code>) remains available via <code>x$length()</code>.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="deprecations-development-version">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-development-version"></a></h3>
-<ul><li>The flat top-level copy of the terminal stage’s fields in <code><a href="../reference/pump_status.html">pump_status()</a></code> is deprecated and will be removed in a future minor release. Read per-stage values from <code>x$stages</code> instead.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="fixes-development-version">Fixes<a class="anchor" aria-label="anchor" href="#fixes-development-version"></a></h3>
-<ul><li>
-<code><a href="../reference/pump_status.html">pump_status()</a></code> on a pipeline whose only stage sits over an empty source now reports it as a stage (with its source and sink) instead of misreporting it as a bare source.</li>
-<li>
-<code>reset_stats()</code> now also clears the error count, so it and <code>stats()</code> agree on what a stats snapshot contains.</li>
-<li>An unreachable slot-acquisition failure in the scheduler now raises an internal error instead of silently dropping a pulled item without releasing it.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="internal-development-version">Internal<a class="anchor" aria-label="anchor" href="#internal-development-version"></a></h3>
-<ul><li>The ~22-member stage/source protocol is now built from a single constructor (<code>.pump_protocol()</code>) that supplies safe defaults and stamps an explicit <code>"stage"</code>/<code>"source"</code> role tag, replacing four hand-maintained copies.</li>
-</ul></div>
-</div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.7.0" id="siphon-070">siphon 0.7.0<a class="anchor" aria-label="anchor" href="#siphon-070"></a></h2>
-<div class="section level3">
-<h3 id="behavior-changes-0-7-0">Behavior changes<a class="anchor" aria-label="anchor" href="#behavior-changes-0-7-0"></a></h3>
-<ul><li>
-<code>pump_run(backend =)</code> and <code>pump_drain(backend =)</code> now apply to stages without explicit backend. Inherited backends resolve at first beat; explicit backends validate at construction.</li>
-<li>
-<code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> is now a specification: workers start on first use. <code><a href="../reference/parallel_setup_workers.html">parallel_setup_workers()</a></code> queues expressions before cluster starts.</li>
-<li>Future backend: removed explicit globals list, restoring automatic detection. Mirai and parallel stage functions must be self-contained.</li>
-<li>All backends inherit from <code>pump_backend</code> class; objects without it are rejected.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="performance-0-7-0">Performance<a class="anchor" aria-label="anchor" href="#performance-0-7-0"></a></h3>
-<ul><li>Stage functions and constant arguments ship once per stage (mirai, parallel) instead of per item. Payloads replay on replacement nodes.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="new-features-0-7-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-7-0"></a></h3>
-<ul><li>Added <code><a href="../reference/pump_custom_backend.html">pump_custom_backend()</a></code> for custom execution via plain R functions: <code>count</code>, <code>submit</code>, <code>is_ready</code>, <code>collect</code>, optional <code>register</code> and <code>open</code>. See “Extending siphon” vignette.</li>
-<li>Added <code>parallel_backend(cluster =)</code> to attach externally-managed PSOCK clusters without ownership. Worker failures surface as item errors.</li>
-<li>
-<code><a href="../reference/pump_drain.html">pump_drain()</a></code> gained <code>on_error</code> and <code>timeout</code>. Draining exhausted pipelines is a no-op.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="internal-0-7-0">Internal<a class="anchor" aria-label="anchor" href="#internal-0-7-0"></a></h3>
-<ul><li>Unified backend contract: lifecycle (<code>.pump_backend_open()</code>/<code>.pump_backend_close()</code>), registration (<code>.pump_executor_register()</code>), submission (<code>.pump_executor_new_job(backend, handle, data)</code>). Shared driver for <code><a href="../reference/pump_run.html">pump_run()</a></code> and <code><a href="../reference/pump_drain.html">pump_drain()</a></code>.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="fixes-0-7-0">Fixes<a class="anchor" aria-label="anchor" href="#fixes-0-7-0"></a></h3>
-<ul><li>Fixed CRAN policy issues; added spelling and linting configuration.</li>
-</ul></div>
-</div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.0" id="siphon-060">siphon 0.6.0<a class="anchor" aria-label="anchor" href="#siphon-060"></a></h2>
-<div class="section level3">
-<h3 id="pipeline-inspection-0-6-0">Pipeline inspection<a class="anchor" aria-label="anchor" href="#pipeline-inspection-0-6-0"></a></h3>
-<ul><li>Added <code><a href="../reference/pump_step.html">pump_step()</a></code> for advancing work without consuming results.</li>
-<li>Added <code><a href="../reference/pump_peek.html">pump_peek()</a></code> for viewing ready results without removing them.</li>
-<li>Added <code><a href="../reference/pump_pop.html">pump_pop()</a></code> for explicitly consuming one result.</li>
-<li>Redesigned <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> to display pipelines as connected frames with worker/buffer occupancy bars, timing metrics, beat-state shares, and bottleneck markers.</li>
-<li>Added ANSI color support for terminal output (honors <code>NO_COLOR</code> and <code>options(siphon.color =)</code>).</li>
-<li>Added box-drawing glyphs with ASCII fallback via <code>options(siphon.unicode = FALSE)</code>.</li>
-<li>Added <code>delivered</code> field to <code><a href="../reference/pump_status.html">pump_status()</a></code> reporting items that left the pipeline.</li>
-<li>Added <code>in_flight</code> and <code>buffered_ids</code> fields to <code><a href="../reference/pump_status.html">pump_status()</a></code> for per-stage tracking.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="timing-model-breaking-0-6-0">Timing model (breaking)<a class="anchor" aria-label="anchor" href="#timing-model-breaking-0-6-0"></a></h3>
-<ul><li>Redesigned stage timing metrics to accumulate only inside <code>next_item()</code>/<code>pop_item()</code> calls.</li>
-<li>Removed fields: <code>poll_hits</code>, <code>poll_misses</code>, <code>poll_wall_time</code>, <code>idle_time</code>.</li>
-<li>Added fields: <code>beats</code>, <code>beats_working</code>/<code>beats_starved</code>/<code>beats_blocked</code>, <code>share_*</code> ratios, <code>pop_hits</code>/<code>pop_misses</code>, <code>tick_time</code>, <code>submit_time</code>, <code>pull_time</code>, <code>coord_time</code>, <code>fn_per_item</code>, <code>throughput</code>.</li>
-<li>Beats on finished pipelines are no longer recorded; stats freeze when source is exhausted.</li>
-<li>
-<code><a href="../reference/pump_step.html">pump_step()</a></code> stops early when further beats cannot change anything.</li>
-<li>All durations now consistently in milliseconds (sources previously used seconds).</li>
-</ul></div>
-<div class="section level3">
-<h3 id="scheduling-0-6-0">Scheduling<a class="anchor" aria-label="anchor" href="#scheduling-0-6-0"></a></h3>
-<ul><li>Changed beat to drain-advance-drain; jobs completing during advance land in buffer immediately.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="fixes-0-6-0">Fixes<a class="anchor" aria-label="anchor" href="#fixes-0-6-0"></a></h3>
-<ul><li>Added <code>%||%</code> compatibility shim for R &lt; 4.4.0.</li>
-<li>Fixed <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> stages to report as <code>"parallel"</code> instead of <code>"unknown"</code>.</li>
-<li>Refactored internal stage tick into single-responsibility helpers.</li>
-</ul></div>
-</div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.5.0" id="siphon-050">siphon 0.5.0<a class="anchor" aria-label="anchor" href="#siphon-050"></a></h2>
-<ul><li>Added <code><a href="../reference/parallel_eval_workers.html">parallel_eval_workers()</a></code> for evaluating expressions in worker global environments.</li>
-<li>Corrected <code><a href="../reference/parallel_backend.html">parallel_backend()</a></code> documentation for shared backends across stages.</li>
-<li>Added vignette section on pooling strategies.</li>
-<li>Changed worker setup to broadcast to all nodes before collecting results.</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.4.2" id="siphon-042">siphon 0.4.2<a class="anchor" aria-label="anchor" href="#siphon-042"></a></h2>
-<div class="section level3">
-<h3 id="package-renaming--api-standardization-0-4-2">Package Renaming &amp; API Standardization<a class="anchor" aria-label="anchor" href="#package-renaming--api-standardization-0-4-2"></a></h3>
-<ul><li>Standardized public API with the <code>pump_</code> prefix:
-<ul><li>
-<code><a href="../reference/pump.html">pump()</a></code> adds a processing stage to a pipeline.</li>
-<li>
-<code><a href="../reference/pump_run.html">pump_run()</a></code> executes the pipeline and collects results.</li>
-<li>
-<code><a href="../reference/pump_source.html">pump_source()</a></code> creates custom input sources using closures.</li>
-<li>
-<code><a href="../reference/pump_status.html">pump_status()</a></code> returns a snapshot of stage state.</li>
-<li>Added new <code><a href="../reference/pump_drain.html">pump_drain()</a></code> function to run pipelines without accumulating items in memory, suitable for persistent daemon processes.</li>
-</ul></li>
-<li>Implemented S3 generic method <code><a href="../reference/length.pump.html">length.pump()</a></code> (replaces <code>$size()</code> method) for R-idiomatic dataset length queries.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="enhancements--bug-fixes-0-4-2">Enhancements &amp; Bug Fixes<a class="anchor" aria-label="anchor" href="#enhancements--bug-fixes-0-4-2"></a></h3>
-<ul><li>Decoupled total pipeline <code>length</code> from intermediate <code>buffer_size</code> to prevent memory bloat and coercion errors on infinite pipelines.</li>
-<li>Stage <code>buffer_size</code> now defaults to <code>min(length(x), 1000L)</code>, capping memory usage for large/infinite sources while allocating correctly for small ones.</li>
-<li>Custom sources created via <code><a href="../reference/pump_source.html">pump_source()</a></code> support resource cleanup callbacks via the <code>close_fn</code> argument.</li>
-<li>Clean up custom sources automatically upon pipeline exit in both <code><a href="../reference/pump_run.html">pump_run()</a></code> and <code><a href="../reference/pump_drain.html">pump_drain()</a></code>.</li>
-<li>Fixed <code>progress</code> bar in <code><a href="../reference/pump_run.html">pump_run()</a></code> to correctly suppress for small inputs.</li>
-<li>Fixed empty input semantics; <code><a href="../reference/pump_run.html">pump_run()</a></code> now returns <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> for zero-length sources instead of throwing an error.</li>
-<li>Fixed per-stage <code>on_error = "stop"</code> to ensure it is honored at each stage instead of only at the final stage.</li>
-<li>Added <code>timeout</code> parameter to <code><a href="../reference/pump_run.html">pump_run()</a></code> to avoid infinite polling on stuck R jobs.</li>
-<li>Added <code><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace()</a></code> checks for <code>mirai</code>, <code>future</code>, and <code>parallel</code> backends with clear error messages.</li>
-<li>Added async-backend scheduling tests for <code>mirai</code>, <code>future</code>, and <code>parallel</code> backends.</li>
-</ul></div>
-</div>
-  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
-    </nav></aside></div>
+  </main></div>
 
 
     <footer><div class="pkgdown-footer-left">
