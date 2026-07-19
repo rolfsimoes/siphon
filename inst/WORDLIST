@@ -1,5 +1,6 @@
 Backpressure
 CMD
+Globals
 Lifecycle
 Mirai
 PSOCK
@@ -8,12 +9,17 @@ async
 backend's
 backoff
 backpressure
+callr
 checkpointing
 deterministically
+globals
 lifecycle
 liteq
 mirai
 pkgdown
 preallocation
+runnable
 serializable
 serverless
+subprocess
+walkthrough
