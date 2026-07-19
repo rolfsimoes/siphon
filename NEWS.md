@@ -1,3 +1,23 @@
+# siphon (development version)
+
+## Behavior changes
+
+- `length()` on a pump pipeline now returns `NA_integer_` for infinite sources instead of `Inf`, matching base R's requirement that `length()` be a non-negative integer. The raw count (still `Inf`) remains available via `x$length()`.
+
+## Deprecations
+
+- The flat top-level copy of the terminal stage's fields in `pump_status()` is deprecated and will be removed in a future minor release. Read per-stage values from `x$stages` instead.
+
+## Fixes
+
+- `pump_status()` on a pipeline whose only stage sits over an empty source now reports it as a stage (with its source and sink) instead of misreporting it as a bare source.
+- `reset_stats()` now also clears the error count, so it and `stats()` agree on what a stats snapshot contains.
+- An unreachable slot-acquisition failure in the scheduler now raises an internal error instead of silently dropping a pulled item without releasing it.
+
+## Internal
+
+- The ~22-member stage/source protocol is now built from a single constructor (`.pump_protocol()`) that supplies safe defaults and stamps an explicit `"stage"`/`"source"` role tag, replacing four hand-maintained copies.
+
 # siphon 0.7.0
 
 ## Behavior changes
